@@ -7,7 +7,7 @@
 :root{
   /* brand / semantic text colours (AA on worst-case light glass) */
   --accent:#08705e;--accent-hi:#14b394;--on-accent:#fff;
-  --green:#08703b;--red:#b51c2a;--orange:#9a4f00;
+  --green:#08703b;--red:#b51c2a;--orange:#8a4600;
   --text:#0a1a1c;--muted:#3c4d55;
   /* glass surfaces */
   --g-fill:rgba(255,255,255,.60);--g-fill-strong:rgba(249,255,253,.82);
@@ -19,7 +19,7 @@
   --line:rgba(10,45,42,.12);
   --input:rgba(255,255,255,.74);--input-border:rgba(10,60,55,.20);
   /* green glass navigation */
-  --tab:rgba(7,78,66,.90);--tab-edge:rgba(190,255,235,.45);--tab-text:#eafff8;--tab-on:rgba(226,255,245,.94);--tab-on-text:#04473b;
+  --tab:rgba(2,74,72,.93);--tab-edge:rgba(190,255,235,.45);--tab-text:#eafff8;--tab-on:rgba(226,255,245,.94);--tab-on-text:#04473b;
   /* tints */
   --win-bg:rgba(8,112,59,.13);--loss-bg:rgba(181,28,42,.11);--chip:var(--g-fill-sub);
   --warn-bg:rgba(255,171,64,.22);--warn-border:rgba(200,120,20,.45);--ok-bg:rgba(61,220,132,.16);--ok-border:rgba(20,150,80,.35);
@@ -41,7 +41,7 @@
   --g-shadow-sm:0 1px 2px rgba(0,0,0,.30),0 4px 12px rgba(0,0,0,.25);
   --line:rgba(255,255,255,.10);
   --input:rgba(0,0,0,.30);--input-border:rgba(255,255,255,.15);
-  --tab:rgba(9,92,78,.78);--tab-edge:rgba(170,255,230,.28);--tab-text:#e3fff6;--tab-on:rgba(150,240,212,.92);--tab-on-text:#032a23;
+  --tab:rgba(3,88,84,.84);--tab-edge:rgba(170,255,230,.28);--tab-text:#e3fff6;--tab-on:rgba(150,240,212,.92);--tab-on-text:#032a23;
   --win-bg:rgba(69,224,142,.15);--loss-bg:rgba(255,134,147,.15);
   --warn-bg:rgba(255,171,64,.16);--warn-border:rgba(255,179,87,.40);--ok-bg:rgba(69,224,142,.13);--ok-border:rgba(69,224,142,.35);
   --sheet:rgba(9,26,26,.86);--scrim:rgba(0,0,0,.45);--scrim-lock:rgba(0,0,0,.60);
@@ -51,11 +51,11 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme]){
   --accent:#3fd6b4;--accent-hi:#5ff0cf;--on-accent:#03201a;--green:#45e08e;--red:#ff9aa4;--orange:#ffb357;--text:#eefaf6;--muted:#a9c2bd;
   --g-fill:rgba(12,32,32,.58);--g-fill-strong:rgba(10,28,28,.84);--g-border:rgba(255,255,255,.12);--g-hi:rgba(255,255,255,.24);
-  --tab:rgba(9,92,78,.76);--sheet:rgba(9,26,26,.86);color-scheme:dark}}
+  --tab:rgba(3,88,84,.84);--sheet:rgba(9,26,26,.86);color-scheme:dark}}
 /* Reduced transparency: near-opaque fills, no blur */
 @media (prefers-reduced-transparency:reduce){
-  :root{--g-fill:rgba(250,254,253,.97);--g-fill-strong:#f7fcfa;--g-fill-sub:rgba(232,244,240,.95);--sheet:#f4fbf8;--tab:#07584b;--input:#fff;--g-sheen:transparent}
-  [data-theme=dark]{--g-fill:rgba(14,30,30,.97);--g-fill-strong:#0c1d1d;--g-fill-sub:rgba(40,60,60,.95);--sheet:#0b1c1c;--tab:#0a5e50;--input:#071414;--g-sheen:transparent}
+  :root{--g-fill:rgba(250,254,253,.97);--g-fill-strong:#f7fcfa;--g-fill-sub:rgba(232,244,240,.95);--sheet:#f4fbf8;--tab:#034b49;--input:#fff;--g-sheen:transparent}
+  [data-theme=dark]{--g-fill:rgba(14,30,30,.97);--g-fill-strong:#0c1d1d;--g-fill-sub:rgba(40,60,60,.95);--sheet:#0b1c1c;--tab:#045a56;--input:#071414;--g-sheen:transparent}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -114,7 +114,7 @@ main{padding:12px calc(12px + var(--sar)) calc(110px + var(--sab)) calc(12px + v
 /* ---------- Green glass tab bar (bottom on phones, sidebar ≥900px) ---------- */
 .tabbar{position:fixed;z-index:30;left:calc(10px + var(--sal));right:calc(10px + var(--sar));bottom:calc(8px + var(--sab));display:flex;justify-content:space-around;padding:6px;border-radius:30px;max-width:700px;margin:0 auto;
   background:linear-gradient(180deg,rgba(190,255,235,.08),transparent 55%),var(--tab);
-  -webkit-backdrop-filter:blur(26px) saturate(220%);backdrop-filter:blur(26px) saturate(220%);
+  -webkit-backdrop-filter:blur(26px) saturate(240%);backdrop-filter:blur(26px) saturate(240%);
   border:1px solid var(--tab-edge);
   box-shadow:inset 0 1px 0 rgba(210,255,242,.60),inset 0 -1px 0 rgba(0,0,0,.20),0 2px 6px rgba(4,50,42,.20),0 14px 34px rgba(4,50,42,.34)}
 .tabbar button{flex:1;min-width:0;appearance:none;border:0;background:transparent;color:var(--tab-text);font-weight:600;font-size:10px;line-height:1.1;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;border-radius:22px;transition:background .18s,color .18s,transform .12s}
@@ -168,7 +168,13 @@ select option{color:#0a1a1c;background:#fff}
 
 /* ---------- Accounts ---------- */
 .acct{padding:14px;margin-bottom:10px}
-.acct .nm{font-weight:750;font-size:16px}.acct .nm .f{color:var(--green);font-weight:800;margin-right:4px}
+.acct-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.acct .nm{font-weight:750;font-size:17px;min-width:0;overflow-wrap:anywhere}.acct .nm .f{color:var(--green);font-weight:800}
+.acct .mid{font-size:24px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.acct-sub{margin-top:2px}.warn-t{color:var(--orange)}
+.acct-more{margin-top:10px}.acct-more>summary{padding:4px 0}
+.acct-btns{margin-bottom:6px}.acct-btns .btn{width:100%}
+.ab-rows{margin-top:10px}.ab-row{display:flex;justify-content:space-between;gap:8px;padding:7px 2px;border-top:1px solid var(--line);font-size:14px}.ab-row:last-child{border-bottom:1px solid var(--line)}
 .acct.funded .nm{color:var(--green)}.acct.evaluation .nm{color:var(--orange)}
 .acct .kv{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0 8px}
 .acct .kv>div{border-radius:11px;padding:6px 7px}.acct .kv .l{font-size:10.5px;color:var(--muted);font-weight:650}.acct .kv .v{font-size:13.5px;font-weight:700}
@@ -294,8 +300,8 @@ button,.btn,.chip,.cal-cell,summary,select,input[type=checkbox],input[type=radio
 button:disabled{cursor:not-allowed}
 /* Solid fallback where backdrop-filter is unsupported (older Firefox/Android WebViews) */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  :root{--g-fill:rgba(250,254,253,.94);--g-fill-strong:rgba(250,254,253,.97);--sheet:rgba(244,251,248,.98);--tab:rgba(7,84,71,.97)}
-  [data-theme=dark]{--g-fill:rgba(14,32,32,.94);--g-fill-strong:rgba(12,28,28,.97);--sheet:rgba(10,26,26,.98);--tab:rgba(9,92,78,.97)}
+  :root{--g-fill:rgba(250,254,253,.94);--g-fill-strong:rgba(250,254,253,.97);--sheet:rgba(244,251,248,.98);--tab:rgba(2,74,72,.97)}
+  [data-theme=dark]{--g-fill:rgba(14,32,32,.94);--g-fill-strong:rgba(12,28,28,.97);--sheet:rgba(10,26,26,.98);--tab:rgba(3,88,84,.97)}
 }
 /* Reduced transparency: drop blur everywhere (fills already made opaque in tokens) */
 @media (prefers-reduced-transparency:reduce){
