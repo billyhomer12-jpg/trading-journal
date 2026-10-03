@@ -3,6 +3,7 @@ import { cls, ds, esc, fmt$, fmtDate, fmtK, norm, pad, r2, todayS } from './util
 import { S, firmBuf, load, ui } from './state.js';
 import { acctById, acctLabel, activeAccts, allowedTransitions, byLineup, cushionOf, dayMap, inView, liveAccts, record, refreshPending, stopOf, tradePnl, transition } from './model.js';
 import { seg } from './ui.js';
+import { dateSourceLabel, importAcctIds, importDayPnl, importsByDate } from './imports.js';
 import { openDay, openImport } from './editors.js';
 
 export function rOverview(){
@@ -32,17 +33,40 @@ export function calendarHtml(view){
   cells.forEach(function(c){var s=ds(c.d),e=map[s],st=e?(e.pnl>0?'win':e.pnl<0?'loss':'flat'):'';
     h+='<button class="cal-cell '+st+(c.dim?' dim':'')+(s===tS?' today':'')+'" data-act="openDay" data-date="'+s+'" data-pnl="'+(e?e.pnl:'')+'"><span class="dn">'+c.d.getDate()+'</span><span class="dp">'+(e?fmtK(e.pnl):'')+'</span></button>'});
   return h+'</div></section>'}
+/* Accounts: top level = import pill + group cards + screenshot imports; tapping a group pushes a drill-in view */
+export function acctGroups(){var live=liveAccts(),f=live.filter(function(a){return a.type==='funded'}),e=live.filter(function(a){return a.type!=='funded'});
+  var c=function(l,st){return l.filter(function(a){return a.status===st}).length};
+  return {funded:{active:c(f,'active'),blown:c(f,'blown'),passed:c(f,'passed')},evaluation:{active:c(e,'active'),blown:c(e,'blown'),passed:c(e,'passed')}}}
+var CHEV='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+var PHOTO='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.7"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5L19 17"/></svg>';
 export function rAccounts(){
-  var act=activeAccts(),fund=act.filter(function(a){return a.type==='funded'}),ev=act.filter(function(a){return a.type!=='funded'});
-  var sb=S.settings.startBalance,ab=r2(fund.reduce(function(s,a){return s+(a.balance-sb-firmBuf(a.firm))},0));
-  var h='<section class="card glass" id="after-buffer"><h2>This month · after buffer (active funded)</h2><div class="big '+cls(ab)+'" id="after-buffer-v">'+fmt$(ab,true)+'</div><div class="muted small">Σ (balance − '+fmt$(sb)+' − firm buffer) over '+fund.length+' funded account'+(fund.length===1?'':'s')+'</div>'+
-    (fund.length?'<div class="ab-rows">'+fund.map(function(a){var v=r2(a.balance-sb-firmBuf(a.firm));return '<div class="ab-row" data-ab="'+a.id+'"><span>F '+esc(a.name)+'</span><b class="'+cls(v)+'" data-v="'+v+'">'+fmt$(v,true)+'</b></div>'}).join('')+'</div>':'')+'</section>';
-  h+='<div class="grid2 acct-btns" id="acct-actions"><button class="btn primary" data-act="openImport" id="btn-open-import">Import balances</button><button class="btn" data-act="addAccount" id="btn-add-acct">+ Add account</button></div>';
-  h+='<div class="sect f" id="sect-funded">Funded · '+fund.length+'</div>'+(fund.map(acctCard).join('')||'<div class="card glass empty small">No active funded accounts</div>');
-  h+='<div class="sect e" id="sect-eval">Evaluation · '+ev.length+'</div>'+(ev.map(acctCard).join('')||'<div class="card glass empty small">No active evaluation accounts</div>');
-  var hist=byLineup(liveAccts().filter(function(a){return a.status!=='active'}));
-  h+='<details class="card glass" id="acct-history"><summary>History · blown / passed ('+hist.length+')</summary>'+(hist.map(function(a){return '<div class="trade-line" data-hist="'+esc(a.name)+'"><div class="row between"><b>'+esc(acctLabel(a))+'</b><span class="tag">'+a.status+'</span></div><div class="small muted">'+esc(a.firm)+' · '+a.type+' · last balance '+fmt$(a.balance)+' · peak '+fmt$(a.peak)+'</div></div>'}).join('')||'<div class="muted small" style="margin-top:8px">None</div>')+'</details>';
-  h+='<details class="card glass" id="import-log"><summary>Import log ('+S.imports.length+')</summary>'+(S.imports.slice().reverse().map(function(im){return '<div class="trade-line row" style="align-items:flex-start">'+(im.image?'<img class="thumb" src="'+im.image+'" alt="screenshot" data-act="viewImg" data-id="'+im.id+'">':'')+'<div><b>'+fmtDate(im.date,{weekday:'short',month:'short',day:'numeric',year:'numeric'})+'</b><div class="small muted">'+im.lines.length+' lines · '+im.lines.filter(function(l){return l.result==='matched'}).length+' matched · '+im.lines.filter(function(l){return l.result==='created'}).length+' created'+(im.setLineup?' · set lineup':'')+'</div></div></div>'}).join('')||'<div class="muted small" style="margin-top:8px">No imports yet</div>')+'</details>';
+  if(ui.acctGroup==='funded'||ui.acctGroup==='evaluation')return rAcctGroup(ui.acctGroup);
+  var g=acctGroups();
+  var h='<div class="acct-top" id="acct-top"><button class="imp-pill glass" data-act="openImport" id="btn-open-import">Import screenshot</button><button class="round-add" data-act="addAccount" id="btn-add-acct" aria-label="Add account"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>';
+  var card=function(key,title,dot,sub){return '<button class="grp-card glass" data-act="openGroup" data-group="'+key+'" id="grp-'+key+'"><span class="grp-dot '+dot+'"></span><span class="grp-tx"><b>'+title+'</b><span class="mono small muted" data-k="sub">'+sub+'</span></span><span class="grp-open">Open'+CHEV+'</span></button>'};
+  h+=card('funded','Funded accounts','dot-f',g.funded.active+' active · '+g.funded.blown+' blown');
+  h+=card('evaluation','Evaluation accounts','dot-e',g.evaluation.active+' active · '+g.evaluation.blown+' blown · '+g.evaluation.passed+' passed');
+  var list=importsByDate();
+  h+='<section class="imp-sec" id="imp-sec"><h2 class="imp-h">Screenshot imports</h2><p class="small muted imp-cap">Arranged by trade date. Correcting a date moves its P&amp;L and journal entry to the same day.</p><button class="btn sm imp-recheck" data-act="recheckDates" id="btn-recheck">Recheck photo dates</button></section>';
+  h+='<section class="imp-list glass" id="imp-list">'+(list.map(impEntry).join('')||'<div class="empty small">No screenshot imports yet. Tap Import screenshot to add balances.</div>')+'</section>';
+  return h}
+function impEntry(im){var n=importAcctIds(im).length,pnl=importDayPnl(im);
+  return '<article class="imp-entry" data-imp="'+im.id+'" data-date="'+im.date+'">'+
+    '<div class="imp-row1">'+(im.thumb||im.image?'<img class="imp-thumb" src="'+(im.thumb||im.image)+'" alt="Screenshot thumbnail"'+(im.image?' data-act="viewImg" data-id="'+im.id+'"':'')+'>':'<div class="imp-thumb ph" aria-label="No screenshot">'+PHOTO+'</div>')+
+    '<div class="imp-meta"><button class="imp-date" data-act="editImpDate" data-id="'+im.id+'" aria-label="Change trade date">'+fmtDate(im.date,{month:'short',day:'numeric',year:'numeric'})+'</button>'+
+    '<div class="mono small imp-file">'+esc(im.fileName||'Balance list')+'</div>'+
+    '<div class="mono small imp-sum" data-k="sum">'+n+' account'+(n===1?'':'s')+' · Day P&amp;L <span data-k="pnl" data-v="'+pnl+'">'+fmt$(pnl)+'</span></div>'+
+    '<div class="imp-src" data-k="src">'+esc(dateSourceLabel(im))+'</div></div></div>'+
+    '<button class="btn wide imp-undo" data-act="undoImport" data-id="'+im.id+'">Undo import</button></article>'}
+export function rAcctGroup(key){
+  var fundedView=key==='funded',live=liveAccts().filter(function(a){return fundedView?a.type==='funded':a.type!=='funded'});
+  var act=byLineup(live.filter(function(a){return a.status==='active'})),hist=byLineup(live.filter(function(a){return a.status!=='active'}));
+  var h='<div class="drill-h" id="drill-h"><button class="back-btn" data-act="closeGroup" id="btn-back" aria-label="Back to Accounts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Accounts</button><h2 class="drill-t"><span class="grp-dot '+(fundedView?'dot-f':'dot-e')+'"></span>'+(fundedView?'Funded':'Evaluation')+' accounts</h2></div>';
+  if(fundedView){var sb=S.settings.startBalance,ab=r2(act.reduce(function(s,a){return s+(a.balance-sb-firmBuf(a.firm))},0));
+    h+='<section class="card glass" id="after-buffer"><h2>This month · after buffer (active funded)</h2><div class="big '+cls(ab)+'" id="after-buffer-v">'+fmt$(ab,true)+'</div><div class="muted small">Σ (balance − '+fmt$(sb)+' − firm buffer) over '+act.length+' funded account'+(act.length===1?'':'s')+'</div>'+
+      (act.length?'<div class="ab-rows">'+act.map(function(a){var v=r2(a.balance-sb-firmBuf(a.firm));return '<div class="ab-row" data-ab="'+a.id+'"><span>F '+esc(a.name)+'</span><b class="'+cls(v)+'" data-v="'+v+'">'+fmt$(v,true)+'</b></div>'}).join('')+'</div>':'')+'</section>'}
+  h+='<div class="sect '+(fundedView?'f':'e')+'" id="'+(fundedView?'sect-funded':'sect-eval')+'">'+(fundedView?'Funded':'Evaluation')+' · '+act.length+'</div>'+(act.map(acctCard).join('')||'<div class="card glass empty small">No active '+(fundedView?'funded':'evaluation')+' accounts</div>');
+  h+='<details class="card glass" id="acct-history"><summary>History · '+(fundedView?'blown':'blown / passed')+' ('+hist.length+')</summary>'+(hist.map(function(a){return '<div class="trade-line" data-hist="'+esc(a.name)+'"><div class="row between"><b>'+esc(acctLabel(a))+'</b><span class="tag '+(a.status==='passed'?'paid':'denied')+'">'+a.status+'</span></div><div class="small muted">'+esc(a.firm)+' · '+a.type+' · last balance '+fmt$(a.balance)+' · peak '+fmt$(a.peak)+'</div></div>'}).join('')||'<div class="muted small" style="margin-top:8px">None</div>')+'</details>';
   return h}
 export function acctCard(a){
   var stop=stopOf(a),cu=cushionOf(a),buf=firmBuf(a.firm),pct=buf?Math.max(0,Math.min(1,cu/buf)):0,locked=stop>=a.startBalance;

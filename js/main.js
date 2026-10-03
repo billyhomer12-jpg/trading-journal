@@ -1,6 +1,6 @@
 import { BUILD } from './config.js';
 // main.js
-import { $, $$, clone, fmt$, norm, pad, todayS } from './util.js';
+import { $, $$, clone, ds, esc, fmt$, fmtDate, norm, pad, todayS } from './util.js';
 import { S, defaults, normalize, riskUsd, save, saveUi, setState, targetUsd, ui } from './state.js';
 import { acctById, allowedTransitions, createBehavior, reindexLineup, stopOf, transition } from './model.js';
 import { parseImport } from './importer.js';
@@ -10,6 +10,7 @@ import { rCalc, scenInputs, scenOut } from './calc.js';
 import { newsState, rNews, refreshNews, setNews } from './news.js';
 import { firmEditRow, downscale, handleJson, imp, impApply, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
 import { demoData } from './demo.js';
+import { exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandidates, undoImport } from './imports.js';
 import { openOnboarding, obAction } from './onboarding.js';
 import { rPayouts, openPayout, savePayout, deletePayout, payAcctChanged, setNextEligible, payCalc, setPayMode } from './payouts.js';
 
@@ -20,7 +21,22 @@ export function render(){
   v.innerHTML=f();v.setAttribute('data-tab',ui.tab);
 }
 export var A={
- tab:function(el){ui.tab=el.dataset.tab;saveUi();render();window.scrollTo(0,0)},
+ tab:function(el){var t=el.dataset.tab;ui.acctGroup=null;ui.tab=t;saveUi();render();window.scrollTo(0,0)}, /* tapping a tab (incl. the current one) returns to its top level */
+ openGroup:function(el){ui.acctGroup=el.dataset.group;render();window.scrollTo(0,0);var b=$('#btn-back');if(b)b.focus({preventScroll:true})},
+ closeGroup:function(){var g=ui.acctGroup;ui.acctGroup=null;render();window.scrollTo(0,0);var c=$('#grp-'+g);if(c)c.focus({preventScroll:true})},
+ undoImport:function(el){var im=S.imports.find(function(x){return x.id===el.dataset.id});if(!im)return;var n=im.lines.filter(function(l){return l.accountId}).length;
+   if(!confirm('Undo the import of '+fmtDate(im.date,{month:'short',day:'numeric',year:'numeric'})+'? This removes the '+n+' balance point'+(n===1?'':'s')+' it recorded (restoring any value it replaced), so balances and Day P&L go back to before it. Journal entries you logged are kept.'))return;
+   var r=undoImport(im.id);save();render();toast('Import undone: '+(r.removed+r.restored)+' balance point'+(r.removed+r.restored===1?'':'s')+' reverted'+(r.deletedAccounts.length?', removed '+r.deletedAccounts.join(', '):''))},
+ editImpDate:function(el){var im=S.imports.find(function(x){return x.id===el.dataset.id});if(!im)return;
+   openSheet('Correct trade date','<div class="small muted" style="margin-bottom:10px">'+esc(im.fileName||'Balance list')+' · currently '+fmtDate(im.date,{weekday:'short',month:'short',day:'numeric',year:'numeric'})+'</div><label class="fld"><span>Trade date</span><input type="date" id="imp-move-date" data-on="impMovePlan" data-id="'+im.id+'" value="'+im.date+'"></label><div class="small" id="imp-move-plan">Pick the day these balances belong to.</div><button class="btn primary wide" style="margin-top:12px" data-act="impMoveSave" data-id="'+im.id+'" id="imp-move-save">Move to this date</button>','imp-date-sheet')},
+ impMoveSave:function(el){var d=$('#imp-move-date').value,pl=planMove(el.dataset.id,d);if(!pl)return;if(pl.from===d)return closeSheet();
+   if(pl.conflicts.length)return toast(fmtDate(d,{month:'short',day:'numeric'})+' already has a balance for '+pl.conflicts.join(', ')+' — undo that import first',true);
+   moveImport(el.dataset.id,d);save();closeSheet();render();toast('Moved '+moveSummary(pl)+' to '+fmtDate(d,{month:'short',day:'numeric'}))},
+ recheckDates:function(){var c=recheckCandidates();
+   if(!c.length)return toast(S.imports.some(function(i){return i.photoDate})?'Photo dates already match (manual dates are left alone)':'No photo dates to recheck — only screenshots whose photo carries a date (EXIF) can be rechecked');
+   if(!confirm('Move '+c.length+' import'+(c.length===1?'':'s')+' to the date stored in the photo?\n'+c.map(function(i){return (i.fileName||'import')+': '+i.date+' → '+i.photoDate}).join('\n')))return;
+   var ok=0,skip=[];c.forEach(function(im){var pl=planMove(im.id,im.photoDate);if(pl.conflicts.length){skip.push(im.fileName||im.date);return}moveImport(im.id,im.photoDate);S.imports.find(function(x){return x.id===im.id}).dateSource='photo';ok++});
+   save();render();toast(ok+' moved to photo date'+(skip.length?', '+skip.length+' skipped (date conflict)':''))},
  seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
    if(s==='view')ui.view=v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
  theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Theme: '+ui.theme)},
@@ -75,7 +91,12 @@ export var ON={
  calcDays:function(el){ui.calc.days=el.value;saveUi();$('#scen-in').innerHTML=scenInputs();$('#scen-out').innerHTML=scenOut();$('#calc-days').focus()},
  calcPD:function(el){var c=ui.calc,i=+el.dataset.i;c.perDay=c.perDay||[];c.perDay[i]=c.perDay[i]||{w:0,l:0,b:0};c.perDay[i][el.dataset.k]=+el.value||0;saveUi();$('#scen-out').innerHTML=scenOut()},
  calcDD:function(el){ui.calc.dd=el.value;saveUi();$('#scen-out').innerHTML=scenOut();var n=$('#calc-dd');n.focus();var L=n.value.length;try{n.setSelectionRange(L,L)}catch(e){}},
- impImg:function(el){var f=el.files&&el.files[0];if(!f)return;downscale(f,640,.6).then(function(u){imp.image=u;$('#imp-img-prev').innerHTML='<img style="width:100%;max-height:220px;object-fit:contain;border-radius:12px" src="'+u+'" alt=""><div class="tiny muted">Stored with this import ('+Math.round(u.length*.75/1024)+' KB)</div>'}).catch(function(){toast('Could not read image',true)})},
+ impImg:function(el){var f=el.files&&el.files[0];if(!f)return;imp.fileName=f.name||null;imp.fileDate=f.lastModified?ds(new Date(f.lastModified)):null;
+   (f.arrayBuffer?f.arrayBuffer():Promise.resolve(null)).then(function(buf){imp.photoDate=buf?exifDate(buf):null;
+     if(imp.photoDate&&!imp.dateManual){$('#imp-date').value=imp.photoDate;$('#imp-date-src').textContent='Date from photo'}});
+   Promise.all([downscale(f,640,.6),downscale(f,160,.6)]).then(function(u){imp.image=u[0];imp.thumb=u[1];$('#imp-img-prev').innerHTML='<img style="width:100%;max-height:220px;object-fit:contain;border-radius:12px" src="'+u[0]+'" alt=""><div class="tiny muted">'+esc(f.name||'')+' · stored with this import ('+Math.round((u[0].length+u[1].length)*.75/1024)+' KB incl. thumbnail)</div>'}).catch(function(){toast('Could not read image',true)})},
+ impDate:function(){imp.dateManual=true;var s=$('#imp-date-src');if(s)s.textContent='Date set manually'},
+ impMovePlan:function(el){var pl=planMove(el.dataset.id,el.value),o=$('#imp-move-plan');if(!pl||!o)return;o.innerHTML=pl.from===el.value?'Same date — nothing to move.':pl.conflicts.length?'<span class="neg">'+esc(fmtDate(el.value,{month:'short',day:'numeric'}))+' already has a balance for '+esc(pl.conflicts.join(', '))+'.</span>':'Moves '+moveSummary(pl)+' to '+esc(fmtDate(el.value,{weekday:'short',month:'short',day:'numeric'}))+'.'},
  impDec:function(){impPreview(true)},
  jsonFile:function(el){var f=el.files&&el.files[0];if(!f)return;var r=new FileReader();r.onload=function(){handleJson(String(r.result))};r.readAsText(f)}
 };
@@ -84,10 +105,11 @@ document.addEventListener('click',function(e){var el=e.target.closest('[data-act
 document.addEventListener('input',function(e){var el=e.target,k=el.dataset&&el.dataset.on;if(k&&ON[k]&&!CHANGE_ONLY[k])ON[k](el,e)});
 document.addEventListener('change',function(e){var el=e.target,k=el.dataset&&el.dataset.on;if(k&&ON[k]&&CHANGE_ONLY[k])ON[k](el,e)});
 /* read-only hooks for tests; mutations go through the same guarded functions */
-window.TJ={state:function(){return clone(S)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
+ui.acctGroup=null;
+window.TJ={state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
 render();
 if(!S.onboarded)openOnboarding(false);
 /* keyboard: Esc closes an (unlocked) sheet */
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){var b=document.querySelector('.sheet-back');if(b&&!b.dataset.lock)closeSheet()}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var b=document.querySelector('.sheet-back');if(b){if(!b.dataset.lock)closeSheet()}else if(ui.acctGroup&&ui.tab==='accounts')A.closeGroup()}});
 /* PWA offline support (web only; Capacitor apps already bundle their files) */
 if(BUILD==='modular'&&'serviceWorker' in navigator&&/^https?:$/.test(location.protocol)&&!window.Capacitor){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('Service worker not registered',e)})})}

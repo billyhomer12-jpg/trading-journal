@@ -34,5 +34,20 @@ export function demoData(){
     {id:'dp4',date:pd_(46),accountId:'demo1',firm:'Tradeify',share:90,requested:1500,received:1350,status:'requested',notes:'Awaiting approval'},
     {id:'dp5',date:pd_(14),accountId:'demo5',firm:'Lucid',share:90,requested:800,received:0,status:'denied',notes:'Consistency rule'}];
   accts[0].nextPayoutDate=pd_(52);accts[1].nextPayoutDate=pd_(47);
-  st.imports=[{id:'demoimp',date:ds(today),appliedAt:new Date().toISOString(),setLineup:true,lines:accts.filter(function(a){return a.status==='active'}).map(function(a){return {name:a.name,balance:a.balance,accountId:a.id,result:'matched',reason:'demo'}})}];
+  /* demo screenshot imports: the last 4 trading days; each one owns (tags) that day's balance points */
+  var days=[];for(var back=0;days.length<4&&back<10;back++){var dd=addDays(new Date(today.getFullYear(),today.getMonth(),today.getDate()),-back);if(dd.getDay()%6)days.push(ds(dd))}
+  var meta=[{file:'IMG_2822.jpeg',src:'photo'},{file:'IMG_2804.jpeg',src:'manual'},{file:'IMG_2791.jpeg',src:'photo'},{file:null,src:'list'}];
+  st.imports=days.map(function(dS,k){var id='demoimp'+k,lines=[];
+    accts.forEach(function(a){var p=a.history.find(function(h){return h.date===dS&&h.src!=='start'});if(!p)return;p.imp=id;lines.push({name:a.name,balance:p.balance,accountId:a.id,result:'matched',reason:'demo',prev:null})});
+    var m=meta[k],im={id:id,date:dS,appliedAt:new Date(Date.now()-k*864e5).toISOString(),setLineup:k===0,dateSource:m.src,lines:lines};
+    if(m.file){im.fileName=m.file;im.thumb=demoThumb(lines.reduce(function(s,l){return s+l.balance},0));if(m.src==='photo')im.photoDate=dS}
+    return im}).filter(function(im){return im.lines.length});
   st.news=S.news;var keep=S;setState(st);refreshPending();setState(keep);return st}
+
+/* tiny generated 'broker screenshot' thumbnail for demo imports (canvas; skipped where unavailable) */
+export function demoThumb(total){try{var c=document.createElement('canvas');c.width=96;c.height=120;var g=c.getContext('2d');if(!g)return null;
+  var gr=g.createLinearGradient(0,0,0,120);gr.addColorStop(0,'#123a8c');gr.addColorStop(1,'#0b2a6e');g.fillStyle=gr;g.fillRect(0,0,96,120);
+  g.fillStyle='rgba(255,255,255,.85)';g.font='bold 8px sans-serif';g.fillText('Account balance',8,16);
+  g.fillStyle='#3ddc84';g.font='bold 15px sans-serif';g.fillText('$'+Math.round(total/1000)+'k',8,36);
+  g.fillStyle='rgba(255,255,255,.25)';for(var i=0;i<5;i++)g.fillRect(8,50+i*13,80-(i%2)*22,5);
+  return c.toDataURL('image/jpeg',.7)}catch(e){return null}}

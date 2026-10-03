@@ -47,11 +47,11 @@ export function saveDay(){
     if(!orig)S.trades.push(t)});
   refreshPending();save();closeSheet();render();toast('Day saved')}
 export var imp={blocks:[],image:null};
-export function openImport(prefill){imp={blocks:[],image:null};
-  openSheet('Import balances','<div class="small muted" style="margin-bottom:10px">Enter balances read from your screenshot <b>in screen order</b> (top → bottom): one per line <b>Name, balance</b>, or JSON. A date line (e.g. 2026-10-02) starts a new dated list. Matching uses lineup position + balance continuity first, then name. Nothing changes until you tap Apply.</div>'+
-  '<label class="fld"><span>Date (for lines without a date header)</span><input type="date" id="imp-date" value="'+todayS()+'"></label>'+
+export function openImport(prefill){imp={blocks:[],image:null,thumb:null,fileName:null,photoDate:null,fileDate:null,dateManual:false};
+  openSheet('Import screenshot','<div class="small muted" style="margin-bottom:10px">Enter balances read from your screenshot <b>in screen order</b> (top → bottom): one per line <b>Name, balance</b>, or JSON. A date line (e.g. 2026-10-02) starts a new dated list. Matching uses lineup position + balance continuity first, then name. Nothing changes until you tap Apply.</div>'+
+  '<label class="fld"><span>Trade date (for lines without a date header)</span><input type="date" id="imp-date" data-on="impDate" value="'+todayS()+'"></label><div class="imp-src small" id="imp-date-src">Date = import day</div>'+
   '<label class="fld"><span>Balances</span><textarea id="imp-text" rows="7" placeholder="TPT-F 4817, 27,340.50&#10;LUC-E 7731, 25,610">'+esc(prefill||'')+'</textarea></label>'+
-  '<label class="fld"><span>Attach screenshot (optional, stored downscaled)</span><input type="file" id="imp-img" accept="image/*" data-on="impImg"></label><div id="imp-img-prev"></div>'+
+  '<label class="fld"><span>Screenshot (optional — stored downscaled; its photo date is used when available)</span><input type="file" id="imp-img" accept="image/*" data-on="impImg"></label><div id="imp-img-prev"></div>'+
   '<button class="btn wide" data-act="impPreview" id="imp-preview-btn">Preview changes</button><div id="imp-out" style="margin-top:12px"></div>','import-sheet')}
 export function readDecisions(){var d={};$$('#imp-out .imp-row.new').forEach(function(r){d[r.dataset.key]={confirm:$('[data-role=confirm]',r).checked,firm:$('[data-role=firm]',r).value,type:$('[data-role=type]',r).value,start:+$('[data-role=start]',r).value||S.settings.startBalance}});return d}
 export function impPreview(keep){
@@ -68,7 +68,8 @@ export function impPreview(keep){
   $('#imp-out').innerHTML=out}
 export function impApply(){if(!imp.blocks.length)return;var dec=readDecisions(),keys=Object.keys(dec),nNew=keys.filter(function(k){return dec[k].confirm}).length,nSkip=keys.length-nNew;
   if(nNew&&!confirm('Create '+nNew+' new account'+(nNew>1?'s':'')+' from unmatched lines? Only do this if the screenshot really shows a new account.'))return;
-  var res=runImport(S,imp.blocks,dec,imp.image);save();closeSheet();ui.tab='accounts';saveUi();render();
+  var dv=$('#imp-date').value,src=imp.dateManual?'manual':imp.photoDate&&dv===imp.photoDate?'photo':imp.fileDate&&dv===imp.fileDate&&dv!==todayS()?'file':'today';
+  var res=runImport(S,imp.blocks,dec,{image:imp.image,thumb:imp.thumb,fileName:imp.fileName,photoDate:imp.photoDate,fileDate:imp.fileDate,dateSource:src});save();closeSheet();ui.tab='accounts';saveUi();render();
   var m=0,c=0;res.forEach(function(b){b.rows.forEach(function(r){if(r.created)c++;else if(r.acct)m++})});toast('Imported: '+m+' updated, '+c+' created'+(nSkip?', '+nSkip+' skipped':''))}
 export function downscale(file,max,q){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){var img=new Image();img.onload=function(){var s=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=fr.result};fr.onerror=rej;fr.readAsDataURL(file)})}
 export function openAddAccount(){openSheet('Add account','<div class="small muted" style="margin-bottom:10px">Starts at its starting balance. After this, its balance only changes through Import balances.</div><label class="fld"><span>Name (as shown on the platform)</span><input id="na-name" autocomplete="off"></label><label class="fld"><span>Prop firm</span><select id="na-firm">'+S.settings.firms.map(function(f){return '<option>'+esc(f.name)+'</option>'}).join('')+'</select></label><label class="fld"><span>Type</span><select id="na-type"><option value="evaluation">Evaluation</option><option value="funded">Funded</option></select></label><label class="fld"><span>Starting balance</span><input id="na-start" type="number" inputmode="decimal" value="'+S.settings.startBalance+'"></label><button class="btn primary wide" data-act="saveAccount" id="na-save">Add account</button>','add-sheet')}
