@@ -1,0 +1,23 @@
+// config.js
+
+export var LS='tj.data.v1';
+export var LSU='tj.ui.v1';
+export var NEWS_URL='https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+export var FF_URL='https://www.forexfactory.com/calendar';
+export var DEFAULT_BEHAVIORS=['Hesitated on the A+','Forced one after missing it','Fought the magnet line','Added filters'];
+export var RULES=[
+ 'Verify account counts, lineup order, balances and classifications against the screenshots before saying anything is done.',
+ 'Never invent accounts, balances or statuses — only record what a screenshot or the user actually provided.',
+ 'Fixes apply retroactively: correcting a record recalculates every total, stop and record derived from it.',
+ 'Balances only change through dated imports — no free editing of balances anywhere else.',
+ 'Never report progress, balances or fills that were not provided.'
+];
+/* Starter presets shown in onboarding. Buffers are suggestions only — users must verify against their firm's current rules. */
+/* share = standard trader profit share (%) used for net payout math; rulesUrl = firm's official payout policy page. Users can edit all of it. */
+export var FIRM_PRESETS=[
+  {name:'Take Profit Trader',buffer:1500,share:80,short:'TPT',plan:'Pro',rulesUrl:'https://takeprofittraderhelp.zendesk.com/hc/en-us/articles/15172219527581-PRO-Account-Profit-Split-Withdrawal-Rules'},
+  {name:'Tradeify',buffer:1000,share:90,short:'Tradeify',plan:'',rulesUrl:'https://help.tradeify.co/en/articles/12853966-select-flex-and-select-daily-payout-policies'},
+  {name:'Lucid',buffer:1100,share:90,short:'Lucid',plan:'',rulesUrl:'https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts'}];
+export var APP_NAME='Trading Journal';
+/* 'modular' = app/ (PWA, Capacitor). build.js rewrites this to 'single' for the one-file build (no service worker there). */
+export var BUILD='modular';
