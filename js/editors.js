@@ -1,11 +1,11 @@
 // editors.js
 import { RULES } from './config.js';
-import { $, $$, clone, cls, esc, fmt$, fmtDate, norm, r2, todayS, uid } from './util.js';
+import { $, $$, clone, cls, ds, esc, fmt$, fmtDate, norm, r2, todayS, uid } from './util.js';
 import { S, fillFirm, normalize, riskUsd, save, saveUi, setState, targetUsd, ui } from './state.js';
 import { acctById, acctLabel, createAccount, liveAccts, orderedActive, refreshPending, statusLabel, suggestBE } from './model.js';
 import { parseImport, runImport } from './importer.js';
-import { DATE_SOURCES } from './imports.js';
-import { closeSheet, icoTxt, info, openSheet, seg, toast } from './ui.js';
+import { DATE_SOURCES, exifDate } from './imports.js';
+import { closeSheet, icoTxt, info, openSheet, seg, themePicker, toast } from './ui.js';
 import { newsState, setNews } from './news.js';
 import { render } from './main.js';
 
@@ -48,12 +48,36 @@ export function saveDay(){
     if(!orig)S.trades.push(t)});
   refreshPending();save();closeSheet();render();toast('Day saved')}
 export var imp={blocks:[],image:null};
-export function openImport(prefill){imp={blocks:[],image:null,thumb:null,fileName:null,photoDate:null,fileDate:null,dateManual:false};
+/* queue of screenshots picked/dropped/pasted together: each one becomes its own dated import (oldest first) */
+export var impQ={items:[],i:0};
+export function openImport(prefill,keepQueue){imp={blocks:[],image:null,thumb:null,fileName:null,photoDate:null,fileDate:null,dateManual:false};if(!keepQueue)impQ={items:[],i:0};
   openSheet('Import screenshot','<div class="row-info small muted" style="margin-bottom:10px"><span><b>Name, balance</b> · screen order</span>'+info('Import format','Enter balances read from your screenshot <b>in screen order</b> (top → bottom): one per line <b>Name, balance</b>, or JSON. A date line (e.g. 2026-10-02) starts a new dated list. Matching uses lineup position + balance continuity first, then name. Nothing changes until you tap Apply.')+'</div>'+
   '<label class="fld"><span>Trade date</span><input type="date" id="imp-date" data-on="impDate" value="'+todayS()+'"></label><div class="imp-src small" id="imp-date-src">'+DATE_SOURCES.today+'</div>'+
   '<label class="fld"><span>Balances</span><textarea id="imp-text" rows="7" placeholder="TPT-F 4817, 27,340.50&#10;LUC-E 7731, 25,610">'+esc(prefill||'')+'</textarea></label>'+
-  '<label class="fld"><span>Screenshot (optional)</span><input type="file" id="imp-img" accept="image/*" data-on="impImg"></label><div id="imp-img-prev"></div>'+
+  '<div class="fld"><span id="imp-drop-l">Screenshots (optional)</span><label class="dropzone" id="imp-drop" for="imp-img" aria-describedby="imp-drop-l">'+DROP_IC+'<b class="dz-fine">Drop screenshots here</b><b class="dz-touch">Choose screenshots</b><span class="dz-or small muted">or</span><span class="btn sm dz-btn">Browse</span><input type="file" id="imp-img" class="sr" accept="image/*" multiple data-on="impImg"></label></div><div id="imp-queue"></div><div id="imp-img-prev"></div>'+
   '<button class="btn wide" data-act="impPreview" id="imp-preview-btn">Preview</button><div id="imp-out" style="margin-top:12px"></div>','import-sheet')}
+var DROP_IC='<svg class="ic dz-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4.5-7.5 7.5"/></svg>';
+export function isImageFile(f){return !!f&&(/^image\//.test(f.type||'')||/\.(png|jpe?g|heic|heif|webp|gif|bmp)$/i.test(f.name||''))}
+/* files from the picker, a drop or a paste → queue (sorted by photo date, then file date, then name) → first one loaded */
+export function impFiles(files){var list=Array.prototype.slice.call(files||[]).filter(isImageFile);
+  if(!list.length){toast('Only images can be imported (PNG, JPEG…)',true);return Promise.resolve(0)}
+  if(!$('#import-sheet'))openImport();
+  return Promise.all(list.map(function(f){return (f.arrayBuffer?f.arrayBuffer():Promise.resolve(null)).then(function(buf){return buf?exifDate(buf):null},function(){return null}).then(function(pd){
+      return downscale(f,160,.6).then(function(t){return t},function(){return null}).then(function(t){return {file:f,photoDate:pd,fileDate:f.lastModified?ds(new Date(f.lastModified)):null,thumb:t}})})})).then(function(items){
+    items.sort(function(a,b){var x=a.photoDate||a.fileDate||'9999',y=b.photoDate||b.fileDate||'9999';return x<y?-1:x>y?1:(a.file.name||'')<(b.file.name||'')?-1:1});
+    impQ={items:items,i:0};useImpItem(0);if(items.length>1)toast(items.length+' screenshots queued — oldest first');return items.length})}
+/* load one queued screenshot into the open import sheet: same date + thumbnail handling as a single pick */
+export function useImpItem(i){var it=impQ.items[i];if(!it||!$('#import-sheet'))return;impQ.i=i;var f=it.file;
+  imp.fileName=f.name||null;imp.fileDate=it.fileDate;imp.photoDate=it.photoDate;imp.image=null;imp.thumb=null;
+  if(imp.photoDate&&!imp.dateManual){$('#imp-date').value=imp.photoDate;$('#imp-date-src').textContent=DATE_SOURCES.photo}
+  var n=impQ.items.length;$('#imp-queue').innerHTML=n>1?'<div class="imp-q"><div class="row between"><b id="imp-q-pos">Screenshot '+(i+1)+' of '+n+'</b><button class="btn sm" data-act="impSkip" id="imp-skip">Skip</button></div><div class="imp-q-strip">'+
+    impQ.items.map(function(x,k){return '<span class="imp-q-th'+(k===i?' cur':k<i?' done':'')+'" title="'+esc(x.file.name||'')+'">'+(x.thumb?'<img src="'+x.thumb+'" alt="">':'')+'</span>'}).join('')+'</div></div>':'';
+  $('#imp-drop').classList.add('has');
+  return downscale(f,640,.6).then(function(big){if(impQ.items[impQ.i]!==it)return;imp.image=big;imp.thumb=it.thumb||null;
+      $('#imp-img-prev').innerHTML='<img style="width:100%;max-height:220px;object-fit:contain;border-radius:12px" src="'+big+'" alt=""><div class="tiny muted" id="imp-img-meta">'+esc(f.name||'')+' · stored with this import ('+Math.round((big.length+(imp.thumb||'').length)*.75/1024)+' KB incl. thumbnail)</div>'})
+    .catch(function(){toast('Could not read image',true)})}
+export function impSkip(){if(impQ.i<impQ.items.length-1){nextImport();toast('Skipped')}else{impQ={items:[],i:0};closeSheet();toast('Skipped')}}
+function nextImport(){var q=impQ,i=q.i+1;openImport(null,true);impQ=q;useImpItem(i)}
 export function readDecisions(){var d={};$$('#imp-out .imp-row.new').forEach(function(r){d[r.dataset.key]={confirm:$('[data-role=confirm]',r).checked,firm:$('[data-role=firm]',r).value,type:$('[data-role=type]',r).value,start:+$('[data-role=start]',r).value||S.settings.startBalance}});return d}
 export function impPreview(keep){
   var dec=keep?readDecisions():{},p=parseImport($('#imp-text').value,$('#imp-date').value||todayS());imp.blocks=p.blocks;
@@ -71,7 +95,8 @@ export function impApply(){if(!imp.blocks.length)return;var dec=readDecisions(),
   if(nNew&&!confirm('Create '+nNew+' new account'+(nNew>1?'s':'')+' from unmatched lines? Only do this if the screenshot really shows a new account.'))return;
   var dv=$('#imp-date').value,src=imp.dateManual?'manual':imp.photoDate&&dv===imp.photoDate?'photo':imp.fileDate&&dv===imp.fileDate&&dv!==todayS()?'file':'today';
   var res=runImport(S,imp.blocks,dec,{image:imp.image,thumb:imp.thumb,fileName:imp.fileName,photoDate:imp.photoDate,fileDate:imp.fileDate,dateSource:src});save();closeSheet();ui.tab='accounts';saveUi();render();
-  var m=0,c=0;res.forEach(function(b){b.rows.forEach(function(r){if(r.created)c++;else if(r.acct)m++})});toast('Imported: '+m+' updated, '+c+' created'+(nSkip?', '+nSkip+' skipped':''))}
+  var m=0,c=0;res.forEach(function(b){b.rows.forEach(function(r){if(r.created)c++;else if(r.acct)m++})});toast('Imported: '+m+' updated, '+c+' created'+(nSkip?', '+nSkip+' skipped':'')+(impQ.i<impQ.items.length-1?' · next screenshot':''));
+  if(impQ.i<impQ.items.length-1)nextImport();else impQ={items:[],i:0}}
 export function downscale(file,max,q){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){var img=new Image();img.onload=function(){var s=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=fr.result};fr.onerror=rej;fr.readAsDataURL(file)})}
 export function openAddAccount(){openSheet('Add account','<div class="row-info small muted" style="margin-bottom:10px"><span>Balance changes only via imports</span>'+info('About new accounts','Starts at its starting balance. After this, its balance only changes through imports.')+'</div><label class="fld"><span>Name</span><input id="na-name" autocomplete="off"></label><label class="fld"><span>Prop firm</span><select id="na-firm">'+S.settings.firms.map(function(f){return '<option>'+esc(f.name)+'</option>'}).join('')+'</select></label><label class="fld"><span>Type</span><select id="na-type"><option value="evaluation">Evaluation</option><option value="funded">Funded</option></select></label><label class="fld"><span>Starting balance</span><input id="na-start" type="number" inputmode="decimal" value="'+S.settings.startBalance+'"></label><button class="btn primary wide" data-act="saveAccount" id="na-save">Add account</button>','add-sheet')}
 export function saveAccount(){var name=$('#na-name').value.trim();if(!name)return toast('Enter a name',true);
@@ -80,7 +105,7 @@ export function saveAccount(){var name=$('#na-name').value.trim();if(!name)retur
 export function firmEditRow(f,i){return '<div class="firm-edit" data-firm="'+i+'"><div class="row" style="margin-bottom:6px"><input data-role="fname" aria-label="Firm name" placeholder="Firm name" value="'+esc(f.name||'')+'" style="flex:2"><input data-role="fbuf" aria-label="Trailing drawdown buffer" placeholder="Buffer $" type="number" inputmode="decimal" value="'+(f.buffer!=null?f.buffer:'')+'" style="flex:1"><button class="btn sm" data-act="delFirm">✕</button></div><div class="row" style="margin-bottom:6px"><label class="mini"><span>Trader share %</span><input data-role="fshare" type="number" inputmode="decimal" min="0" max="100" value="'+(f.share!=null?f.share:100)+'"></label><label class="mini"><span>Short name</span><input data-role="fshort" value="'+esc(f.short||'')+'"></label><label class="mini"><span>Plan</span><input data-role="fplan" value="'+esc(f.plan||'')+'" placeholder="e.g. Pro"></label></div><input data-role="furl" type="url" inputmode="url" placeholder="Payout rules URL" aria-label="Official payout rules URL" value="'+esc(f.rulesUrl||'')+'"></div>'}
 export function openSettings(){var st=S.settings;
   var h='<details class="card glass rules" id="rules"><summary>Rules ('+RULES.length+')</summary><ol>'+RULES.map(function(r){return '<li>'+esc(r)+'</li>'}).join('')+'</ol><div class="tiny muted">Enforced in code: balances change only via imports · status transitions are one-way · all totals, stops and records are recomputed from the records every time.</div></details>';
-  h+='<div class="fld"><span>Appearance</span>'+seg('theme',[['auto','Auto'],['light','Light'],['dark','Dark']],ui.theme)+'</div>';
+  h+='<div class="fld" id="s-theme"><span>Theme</span>'+themePicker()+'</div>';
   h+='<div class="fld"><span>Prop firms</span><div id="firms">'+st.firms.map(function(f,i){return firmEditRow(f,i)}).join('')+'</div><button class="btn sm" data-act="addFirm">+ Firm</button></div>';
   h+='<div class="grid2"><label class="fld"><span>Starting balance</span><input id="s-start" type="number" value="'+st.startBalance+'"></label><label class="fld"><span>$ per point</span><input id="s-dpp" type="number" step="any" value="'+st.dollarsPerPoint+'"></label><label class="fld"><span>Risk (points)</span><input id="s-risk" type="number" value="'+st.riskPts+'"></label><label class="fld"><span>Target (points)</span><input id="s-target" type="number" value="'+st.targetPts+'"></label><label class="fld"><span>BE threshold ($)</span><input id="s-be" type="number" value="'+st.beThreshold+'"></label><label class="fld"><span>Import tolerance ($)</span><input id="s-tol" type="number" value="'+st.continuityTol+'"></label></div>';
   h+='<div class="small muted" style="margin-bottom:10px">Per contract: risk '+fmt$(riskUsd())+' · target '+fmt$(targetUsd())+'</div><button class="btn primary wide" data-act="saveSettings" id="s-save">Save settings</button><hr>';

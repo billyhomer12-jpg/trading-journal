@@ -1,6 +1,7 @@
 // ui.js
 import { $, esc } from './util.js';
 import { ui } from './state.js';
+import { APPEARANCE, THEMES } from './config.js';
 
 /* SF-Symbols-style line icons (24px grid, 1.75 stroke set in CSS) */
 function svgI(d){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+d+'</svg>'}
@@ -23,11 +24,19 @@ export function info(label,html,side,id){return '<details class="info'+(side?' '
 /* icon + short word; the full wording goes to aria-label */
 export function icoTxt(ic,txt){return ICON[ic]+'<span>'+txt+'</span>'}
 export var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):{matches:false};
-export function applyTheme(){var t=ui.theme==='auto'?(mq.matches?'dark':'light'):ui.theme;document.documentElement.setAttribute('data-theme',t);
-  var b=$('#theme-btn');b.innerHTML=ui.theme==='auto'?ICON.auto:ui.theme==='dark'?ICON.moon:ICON.sun;b.title='Theme: '+ui.theme}
+export function applyTheme(){var t=ui.theme==='auto'?(mq.matches?'dark':'light'):ui.theme,de=document.documentElement;de.setAttribute('data-theme',t);de.setAttribute('data-accent',ui.accent||'sea');
+  var b=$('#theme-btn');b.innerHTML=ui.theme==='auto'?ICON.auto:ui.theme==='dark'?ICON.moon:ICON.sun;b.title='Appearance: '+appearanceName();
+  /* browser chrome (status bar / Android toolbar) follows the themed backdrop */
+  var bg=getComputedStyle(de).getPropertyValue('--body-bg').trim();if(bg)document.querySelectorAll('meta[name=theme-color]').forEach(function(m){m.setAttribute('content',bg)})}
+export function appearanceName(){var a=APPEARANCE.find(function(x){return x[0]===ui.theme});return a?a[1]:'System'}
+/* the one theme picker (welcome page + Settings): accent swatches (radio group) + Light / Dark / System */
+export function themePicker(){return '<div class="tp"><div class="sw-row" role="radiogroup" aria-label="Color theme">'+THEMES.map(function(t){var on=ui.accent===t[0];
+    return '<button class="sw'+(on?' on':'')+'" data-act="accent" data-val="'+t[0]+'" role="radio" aria-checked="'+on+'" tabindex="'+(on?0:-1)+'"><i style="background:linear-gradient(135deg,'+t[2]+','+t[3]+')"></i><span>'+t[1]+'</span></button>'}).join('')+'</div>'+
+  seg('theme',APPEARANCE,ui.theme)+'</div>'}
 if(mq.addEventListener)mq.addEventListener('change',applyTheme);else if(mq.addListener)mq.addListener(applyTheme);
 export var toastT;
 export function toast(msg,bad){var el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast glass';document.body.appendChild(el)}el.textContent=msg;el.style.color=bad?'var(--red)':'var(--text)';el.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){el.hidden=true},2600)}
-export function openSheet(title,html,id,lock){$('#sheet-root').innerHTML='<div class="sheet-back'+(lock?' locked':'')+'" data-act="sheetBack"'+(lock?' data-lock="1"':'')+'><div class="sheet" id="'+(id||'sheet')+'" role="dialog" aria-label="'+esc(title)+'"><div class="sheet-h"><h2>'+esc(title)+'</h2>'+(lock?'':'<button class="iconbtn" data-act="closeSheet" aria-label="Close">'+ICON.close+'</button>')+'</div><div class="sheet-b">'+html+'</div></div></div>';document.body.style.overflow='hidden'}
+/* back = optional data-act for a leading ‹ Back control (multi-page flows, e.g. onboarding page 2 → page 1) */
+export function openSheet(title,html,id,lock,back){$('#sheet-root').innerHTML='<div class="sheet-back'+(lock?' locked':'')+'" data-act="sheetBack"'+(lock?' data-lock="1"':'')+'><div class="sheet" id="'+(id||'sheet')+'" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="sheet-h">'+(back?'<button class="iconbtn sheet-backbtn" data-act="'+back+'" id="'+(id||'sheet')+'-back" aria-label="Back">'+ICON.chevL+'</button>':'')+'<h2>'+esc(title)+'</h2>'+(lock?'':'<button class="iconbtn" data-act="closeSheet" aria-label="Close">'+ICON.close+'</button>')+'</div><div class="sheet-b">'+html+'</div></div></div>';document.body.style.overflow='hidden'}
 export function closeSheet(){$('#sheet-root').innerHTML='';document.body.style.overflow=''}
 export function seg(name,opts,cur){return '<div class="seg" role="tablist" data-segname="'+name+'">'+opts.map(function(o){return '<button data-act="seg" data-seg="'+name+'" data-val="'+o[0]+'" class="'+(cur===o[0]?'on':'')+'">'+o[1]+'</button>'}).join('')+'</div>'}

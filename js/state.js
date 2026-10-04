@@ -1,5 +1,5 @@
 // state.js
-import { DEFAULT_BEHAVIORS, FIRM_PRESETS, LS, LSU } from './config.js';
+import { DEFAULT_BEHAVIORS, FIRM_PRESETS, LS, LSU, THEMES } from './config.js';
 import { norm, r2, uid } from './util.js';
 import { toast } from './ui.js';
 
@@ -22,11 +22,13 @@ export function normalize(o){
   return s}
 export function load(){try{var raw=localStorage.getItem(LS);if(raw)return normalize(JSON.parse(raw))}catch(e){console.warn('Could not load saved data',e)}return defaults()}
 export var S=load();
-export var ui=Object.assign({tab:'overview',cal:null,theme:'auto',calc:{n:1,mode:'seq',seq:'WWLWL',days:3,perDay:[],dd:2500}},(function(){try{return JSON.parse(localStorage.getItem(LSU))||{}}catch(e){return {}}})());
+export var ui=Object.assign({tab:'overview',cal:null,theme:'auto',accent:'sea',calc:{n:1,mode:'seq',seq:'WWLWL',days:3,perDay:[],dd:2500}},(function(){try{return JSON.parse(localStorage.getItem(LSU))||{}}catch(e){return {}}})());
 export function save(){try{localStorage.setItem(LS,JSON.stringify(S));return true}catch(e){toast('Storage full — remove screenshot images or export & clear',true);return false}}
 export function setState(x){S=x}
 /* one Funded / Evaluation / Both choice shared by Overview + Journal (migrates the old per-tab ui.view / ui.jscope) */
-(function(){var v=ui.scope||ui.view||(ui.jscope==='all'?'both':ui.jscope)||'both';ui.scope=['funded','evaluation','both'].indexOf(v)>=0?v:v==='all'?'both':'both';delete ui.view;delete ui.jscope})();
+(function(){var v=ui.scope||ui.view||(ui.jscope==='all'?'both':ui.jscope)||'both';ui.scope=['funded','evaluation','both'].indexOf(v)>=0?v:v==='all'?'both':'both';delete ui.view;delete ui.jscope;
+  /* appearance (light | dark | auto = System) + accent theme, validated */
+  if(['auto','light','dark'].indexOf(ui.theme)<0)ui.theme='auto';if(!THEMES.some(function(t){return t[0]===ui.accent}))ui.accent='sea'})();
 export function saveUi(){try{localStorage.setItem(LSU,JSON.stringify(ui))}catch(e){}}
 export function riskUsd(){return S.settings.riskPts*S.settings.dollarsPerPoint}
 export function targetUsd(){return S.settings.targetPts*S.settings.dollarsPerPoint}

@@ -4,14 +4,14 @@ import { $, $$, clone, ds, esc, fmt$, fmtDate, norm, pad, todayS } from './util.
 import { S, defaults, normalize, riskUsd, save, saveUi, setState, targetUsd, ui } from './state.js';
 import { acctById, allowedTransitions, createBehavior, reindexLineup, scopeRecord, stopOf, transition } from './model.js';
 import { parseImport } from './importer.js';
-import { applyTheme, closeSheet, openSheet, seg, toast } from './ui.js';
+import { appearanceName, applyTheme, closeSheet, openSheet, seg, toast } from './ui.js';
 import { rAccounts, rJournal, rOverview, JOURNAL_RECENT, jMonth } from './views.js';
 import { rCalc, scenInputs, scenOut, calcPaint, calcStep, calcReset, calcMath, cv, CALC_LIM } from './calc.js';
 import { newsState, rNews, refreshNews, setNews } from './news.js';
-import { firmEditRow, downscale, handleJson, imp, impApply, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
+import { firmEditRow, downscale, handleJson, imp, impApply, impFiles, impSkip, isImageFile, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
 import { demoData } from './demo.js';
 import { DATE_SOURCES, exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandidates, undoImport } from './imports.js';
-import { openOnboarding, obAction } from './onboarding.js';
+import { openOnboarding, openWelcome, obAction } from './onboarding.js';
 import { rPayouts, openPayout, savePayout, deletePayout, payAcctChanged, setNextEligible, payCalc, setPayMode } from './payouts.js';
 
 /* Count-up for headline totals. The element's real text is always the final value (screen readers,
@@ -56,7 +56,9 @@ export var A={
    if(s==='scope')ui.scope=v==='all'?'both':v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
  calcStep:function(el){var p=$('#proj-net'),f=p&&moneyOf(p.textContent);tap();calcStep(el.dataset.k,+el.dataset.d);countUp($('#proj-net'),f)},
  calcReset:function(){calcReset();toast('Scenario cleared')},
- theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Theme: '+ui.theme)},
+ theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Appearance: '+appearanceName())},
+ accent:function(el){setAccent(el.dataset.val)},
+ obBack:function(){obAction({dataset:{ob:'back'}})},
  settings:function(){openSettings()},closeSheet:closeSheet,
  sheetBack:function(el,e){if(e.target===el&&!el.dataset.lock)closeSheet()},
  rerunSetup:function(){openOnboarding(true)},
@@ -80,7 +82,7 @@ export var A={
  journalMore:function(){ui.journalMore=true;saveUi();render();var d=document.querySelectorAll('#view .day')[JOURNAL_RECENT];if(d){var b=d.querySelector('button');if(b)b.focus({preventScroll:true})}},
  createBeh:function(el){if(createBehavior(el.dataset.label)){save();render();toast('Box created')}},
  dismissBeh:function(el){S.dismissedBehaviors.push(norm(el.dataset.label));save();render()},
- openImport:function(){openImport()},impPreview:function(){impPreview(false)},impApply:impApply,
+ openImport:function(){openImport()},impPreview:function(){impPreview(false)},impApply:impApply,impSkip:function(){impSkip()},
  addAccount:openAddAccount,saveAccount:saveAccount,
  transition:function(el){var a=acctById(el.dataset.id),t=allowedTransitions(a).find(function(x){return x.key===el.dataset.key});if(!t)return;
    if(!confirm(t.label+' — '+a.name+'? This is one-way and cannot be undone.'))return;transition(a,t.key);save();render();toast(a.name+': '+t.key)},
@@ -97,7 +99,7 @@ export var A={
    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){toast('Exported '+name+' & copied')},function(){toast('Exported '+name)});else toast('Exported '+name)},
  importPaste:function(){handleJson($('#json-paste').value)},
  loadDemo:function(){if((S.accounts.length||S.trades.length)&&!confirm('Replace current data with DEMO data? Export first if you want a backup.'))return;setState(normalize(demoData()));save();closeSheet();render();toast('Demo data loaded')},
- clearAll:function(){if(!confirm('Clear ALL data on this device? This cannot be undone.'))return;if(!confirm('Really delete everything? Export a backup first if unsure.'))return;var news=S.news;setState(defaults());S.news=news;save();closeSheet();render();toast('All data cleared');openOnboarding(false)}
+ clearAll:function(){if(!confirm('Clear ALL data on this device? This cannot be undone.'))return;if(!confirm('Really delete everything? Export a backup first if unsure.'))return;var news=S.news;setState(defaults());S.news=news;save();closeSheet();render();toast('All data cleared');openWelcome()}
 };
 export var ON={
  payAcct:function(el){payAcctChanged(el)},
@@ -112,10 +114,7 @@ export var ON={
  calcDays:function(el){ui.calc.days=el.value;saveUi();$('#scen-in').innerHTML=scenInputs();$('#scen-out').innerHTML=scenOut();$('#calc-days').focus()},
  calcPD:function(el){var c=ui.calc,i=+el.dataset.i;c.perDay=c.perDay||[];c.perDay[i]=c.perDay[i]||{w:0,l:0,b:0};c.perDay[i][el.dataset.k]=+el.value||0;saveUi();$('#scen-out').innerHTML=scenOut()},
  calcDD:function(el){ui.calc.dd=el.value;saveUi();$('#scen-out').innerHTML=scenOut();var n=$('#calc-dd');n.focus();var L=n.value.length;try{n.setSelectionRange(L,L)}catch(e){}},
- impImg:function(el){var f=el.files&&el.files[0];if(!f)return;imp.fileName=f.name||null;imp.fileDate=f.lastModified?ds(new Date(f.lastModified)):null;
-   (f.arrayBuffer?f.arrayBuffer():Promise.resolve(null)).then(function(buf){imp.photoDate=buf?exifDate(buf):null;
-     if(imp.photoDate&&!imp.dateManual){$('#imp-date').value=imp.photoDate;$('#imp-date-src').textContent=DATE_SOURCES.photo}});
-   Promise.all([downscale(f,640,.6),downscale(f,160,.6)]).then(function(u){imp.image=u[0];imp.thumb=u[1];$('#imp-img-prev').innerHTML='<img style="width:100%;max-height:220px;object-fit:contain;border-radius:12px" src="'+u[0]+'" alt=""><div class="tiny muted">'+esc(f.name||'')+' · stored with this import ('+Math.round((u[0].length+u[1].length)*.75/1024)+' KB incl. thumbnail)</div>'}).catch(function(){toast('Could not read image',true)})},
+ impImg:function(el){var fs=Array.prototype.slice.call(el.files||[]);el.value='';if(fs.length)impFiles(fs)},
  impDate:function(){imp.dateManual=true;var s=$('#imp-date-src');if(s)s.textContent=DATE_SOURCES.manual},
  impMovePlan:function(el){var pl=planMove(el.dataset.id,el.value),o=$('#imp-move-plan');if(!pl||!o)return;o.innerHTML=pl.from===el.value?'Same date — nothing to move.':pl.conflicts.length?'<span class="neg">'+esc(fmtDate(el.value,{month:'short',day:'numeric'}))+' already has a balance for '+esc(pl.conflicts.join(', '))+'.</span>':'Moves '+moveSummary(pl)+' to '+esc(fmtDate(el.value,{weekday:'short',month:'short',day:'numeric'}))+'.'},
  impDec:function(){impPreview(true)},
@@ -130,7 +129,30 @@ ui.acctGroup=null;ui.journalMore=false;
 document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='calc-adv'&&!!cv().adv!==e.target.open){cv().adv=e.target.open;saveUi()}},true);
 window.TJ={calc:function(){return calcMath()},record:function(sc){var r=scopeRecord(sc);return {w:r.w,l:r.l,be:r.be,wr:r.wr,trading:r.trading,noTrading:r.noTrading}},scope:function(){return ui.scope},state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
 render();
-if(!S.onboarded)openOnboarding(false);
+if(!S.onboarded)openWelcome();
+/* ---- drag-and-drop + paste for screenshot imports ----
+   Import sheet open: the whole sheet accepts files (drop zone highlights). Accounts / Journal with no sheet open:
+   drop anywhere → a full-page target appears → the import sheet opens with the files queued. Elsewhere file drops are
+   swallowed (so the browser never navigates away to the image). Paste (⌘/Ctrl+V) of images works the same way. */
+var dragDepth=0;
+function dropTarget(){if($('#import-sheet'))return 'sheet';if(!$('.sheet-back')&&S.onboarded&&(ui.tab==='accounts'||ui.tab==='journal'))return 'tab';return null}
+function hasFiles(e){var t=e.dataTransfer&&e.dataTransfer.types;return !!t&&Array.prototype.indexOf.call(t,'Files')>=0}
+function dropUi(on){var t=on&&dropTarget(),ov=$('#drop-ov'),z=$('#imp-drop');
+  if(t==='tab'&&!ov){ov=document.createElement('div');ov.id='drop-ov';ov.innerHTML='<div class="drop-card glass"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9"/><path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg><b>Drop screenshots to import</b></div>';ov.setAttribute('role','status');document.body.appendChild(ov)}
+  if(ov)ov.hidden=t!=='tab';if(z)z.classList.toggle('over',t==='sheet')}
+document.addEventListener('dragenter',function(e){if(!hasFiles(e))return;e.preventDefault();dragDepth++;dropUi(true)});
+document.addEventListener('dragover',function(e){if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect=dropTarget()?'copy':'none'});
+document.addEventListener('dragleave',function(e){if(!hasFiles(e))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)dropUi(false)});
+document.addEventListener('drop',function(e){if(!hasFiles(e))return;e.preventDefault();dragDepth=0;var t=dropTarget();dropUi(false);if(!t)return;
+  var fs=Array.prototype.slice.call(e.dataTransfer.files||[]);if(fs.length)impFiles(fs)});
+document.addEventListener('paste',function(e){var cd=e.clipboardData;if(!cd||!dropTarget())return;var fs=Array.prototype.slice.call(cd.files||[]).filter(isImageFile);
+  if(!fs.length&&cd.items)Array.prototype.forEach.call(cd.items,function(it){if(it.kind==='file'){var f=it.getAsFile();if(isImageFile(f))fs.push(f)}});
+  if(!fs.length)return;/* plain text paste stays untouched */e.preventDefault();impFiles(fs.map(function(f,i){return f.name&&f.name!=='image.png'?f:new File([f],'Pasted '+todayS()+(fs.length>1?' '+(i+1):'')+'.png',{type:f.type||'image/png',lastModified:Date.now()})}))});
+/* accent theme: one shared setting (welcome page + Settings), applied live to every token */
+function setAccent(v){ui.accent=v;saveUi();applyTheme();$$('[data-act=accent]').forEach(function(b){var on=b.dataset.val===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on);b.tabIndex=on?0:-1})}
+/* radio-group keys for the swatches: arrows move + select (roving tabindex) */
+document.addEventListener('keydown',function(e){var b=e.target.closest&&e.target.closest('[data-act=accent]');if(!b)return;var d={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key];if(!d)return;e.preventDefault();
+  var all=$$('[data-act=accent]',b.parentNode),n=all[(all.indexOf(b)+d+all.length)%all.length];setAccent(n.dataset.val);n.focus()});
 /* keyboard: Esc closes an (unlocked) sheet */
 /* (i) popovers: one open at a time, close on outside tap / Esc, nudge the bubble back on-screen */
 function closeInfos(except){document.querySelectorAll('details.info[open]').forEach(function(d){if(d!==except)d.open=false})}

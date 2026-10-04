@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="css/styles.css">
+<script>/* paint the saved theme before the app modules load (no flash of the default theme) */try{var u=JSON.parse(localStorage.getItem('tj.ui.v1'))||{},d=document.documentElement;d.setAttribute('data-accent',u.accent||'sea');d.setAttribute('data-theme',u.theme==='dark'||u.theme==='light'?u.theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
 </head>
 <body>
 <header class="topbar glass">
