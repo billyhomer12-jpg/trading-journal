@@ -27,7 +27,7 @@
 <p class="meta">Effective date: October 4, 2026 · Last updated: October 4, 2026</p>
 
 <div class="tldr">
-<p><strong>The short version.</strong> Your trading journal (trades, balances, accounts, payouts, notes and screenshots) stays on your device. If you create an account we store your email, username, an optional profile photo and a few preferences so you can sign in. Your password is handled by our authentication provider and stored only as a hash. We don't sell your data, we don't show ads, and we don't use analytics or tracking tools. You can delete your account in the app at any time.</p>
+<p><strong>The short version.</strong> Your trading journal (trades, balances, accounts, payouts, notes and screenshots) stays on your device. If you create an account we store your email, username, an optional profile photo and a few preferences so you can sign in. Your password is handled by our authentication provider and stored only as a hash. We don't sell your data, we don't show ads, and we don't use analytics or tracking tools. Account data is stored with Supabase in the US West region. The App's owner can see account holders' email, username and marketing choice, and uses them only for support and to email people who opted in. You can delete your account in the app at any time.</p>
 </div>
 
 <h2 id="contents">Contents</h2>
@@ -98,6 +98,8 @@
 <li>To answer support requests, fix bugs and improve the App.</li>
 <li>To comply with the law, enforce our <a href="terms.html">Terms of Use</a>, and protect our rights and the rights of others.</li>
 </ul>
+<h3 id="owner-access">Who can see your account information</h3>
+<p>The App's owner (Billy Homer) can see each account holder's email address, username and marketing choice, along with basic account details such as when the account was created, when it last signed in, whether the email is confirmed and whether 2FA is on. The owner uses this only to run support and to send marketing emails to people who opted in. This access is limited to the owner, requires two-factor authentication, and is logged. The owner cannot see your password or your journal, which stays on your device.</p>
 
 <h2 id="network">6. Network requests and third-party content</h2>
 <ul>
@@ -112,7 +114,7 @@
 <div class="tbl"><table>
 <thead><tr><th>Provider</th><th>Role</th><th>Data involved</th></tr></thead>
 <tbody>
-<tr><td><a href="https://supabase.com/privacy" rel="noopener">Supabase, Inc.</a></td><td>Authentication, database and file storage (processor)</td><td>Account data, profile photo, 2FA data, security logs</td></tr>
+<tr><td><a href="https://supabase.com/privacy" rel="noopener">Supabase, Inc.</a></td><td>Authentication, database and file storage (processor; account data is stored in the United States, US West region)</td><td>Account data, profile photo, 2FA data, security logs</td></tr>
 <tr><td><a href="https://www.apple.com/legal/privacy/" rel="noopener">Apple Inc.</a></td><td>App Store distribution and in-app purchase payments (independent controller for payments)</td><td>Purchase and subscription records</td></tr>
 <tr><td><a href="https://policies.google.com/privacy" rel="noopener">Google LLC</a></td><td>Google Play distribution and Play Billing payments (independent controller for payments)</td><td>Purchase and subscription records</td></tr>
 <tr><td><a href="https://www.revenuecat.com/privacy/" rel="noopener">RevenueCat, Inc.</a></td><td>Subscription management, when subscriptions launch (processor)</td><td>Anonymous app user ID, purchase and subscription status</td></tr>
@@ -161,7 +163,7 @@
 <p>Your account login (username or email with password) is "sensitive personal information" under California law. We use it only to provide and secure your account, as permitted, and not to infer characteristics about you. <strong>We do not sell or share personal information</strong>, as those terms are defined in the CCPA, and have not done so in the last 12 months. We have no actual knowledge of selling or sharing information of consumers under 16. You have the rights to know, delete, correct and limit, and to non-discrimination, as described in <a href="#rights">section 10</a>.</p>
 
 <h2 id="transfers">13. International transfers</h2>
-<p>We are based in the United States, and our providers may process data in the United States and other countries. Where required, transfers from the EEA, UK or Switzerland rely on appropriate safeguards, such as the European Commission's Standard Contractual Clauses or the provider's certification under the EU-U.S. Data Privacy Framework.</p>
+<p>We are based in the United States. Account data is stored by Supabase in the United States (US West region), and our other providers may process data in the United States and other countries. Where required, transfers from the EEA, UK or Switzerland rely on appropriate safeguards, such as the European Commission's Standard Contractual Clauses or the provider's certification under the EU-U.S. Data Privacy Framework.</p>
 
 <h2 id="security">14. Security</h2>
 <p>We use encrypted connections (HTTPS/TLS), hashed passwords and recovery codes, row-level database access rules so each user can reach only their own records, and optional two-factor authentication. No method of transmission or storage is completely secure, so we can't guarantee absolute security. Please use a strong, unique password and turn on 2FA. If a data breach affects you, we will notify you as the law requires.</p>

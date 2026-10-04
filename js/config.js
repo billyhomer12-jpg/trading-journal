@@ -23,8 +23,8 @@ export var APP_NAME='Trading Journal';
    Paste from Supabase → Project Settings → API Keys: the Project URL and the PUBLISHABLE key (sb_publishable_…;
    the legacy "anon" key also works). It is public by design — Row Level Security (supabase/schema.sql) protects
    the data. Never put a secret (sb_secret_…) or service_role key here. */
-export var SUPABASE_URL='';
-export var SUPABASE_ANON_KEY='';
+export var SUPABASE_URL='https://jrcozcrfbjcsuqkmoaki.supabase.co';
+export var SUPABASE_ANON_KEY='sb_publishable_cAiiq9Vv_9H_3ZCGD6yOXA_NeDnSkAe';
 export var SUPABASE_CDN='https://esm.sh/@supabase/supabase-js@2.117.2';
 /* where email links (confirm / reset password) return to; empty = the current page */
 /* legal + support pages live in the Pages repo (legal/, support/). Web: relative to the app root;

@@ -36,7 +36,17 @@ export function bootAccount(){var a=auth();paintAvatar();
   if(a.kind==='local'){go(a.current());return}
   if(!S.onboarded)openWelcome();
   a.onEvent(function(e){if(e==='recovery')openAuth({from:'boot',mode:'newpass'})});
-  a.init().then(go).catch(function(){toast('Could not reach the account server',true);if(S.onboarded&&!isGuest())openAuth({from:'boot'})})}
+  /* returning from an email link (confirm sign-up / reset): PKCE can only finish in the browser that started it;
+     elsewhere the email is still confirmed, so ask the user to sign in */
+  var link=location.search+location.hash,fromLink=/[?&#](code|token_hash|access_token|error_description)=/.test(link),linkErr=(link.match(/error_description=([^&]+)/)||[])[1];
+  a.init().then(function(u){
+    if(fromLink){try{history.replaceState(null,'',location.pathname)}catch(e){}}
+    if(fromLink&&!u&&!a.pendingMfa()){paintAvatar();return openAuth({from:'boot',mode:'signin',notice:linkErr?decodeURIComponent(linkErr.replace(/\+/g,' ')):'Email confirmed. Sign in to continue.',noticeErr:!!linkErr})}
+    if(fromLink&&u)toast('Email confirmed');go(u)})
+  .catch(function(){
+    /* offline / server unreachable: the journal is local, so never lock a signed-in user out of it */
+    var had=false;try{had=Object.keys(localStorage).some(function(k){return /^sb-.+-auth-token$/.test(k)})}catch(e){}
+    toast(had?'Offline: account features unavailable':'Could not reach the account server',true);if(S.onboarded&&!isGuest()&&!had)openAuth({from:'boot'})})}
 /* welcome page → "Start journal": account first (unless signed in / chose "Not now"), then Get started */
 export function afterWelcome(){if(curUser()||isGuest())openOnboarding(false);else openAuth({from:'welcome',mode:'signup'})}
 function afterAuth(u,created){setGuest(false);if(created||!u.theme)syncTheme();else applyProfileTheme(u);paintAvatar();
@@ -44,7 +54,7 @@ function afterAuth(u,created){setGuest(false);if(created||!u.theme)syncTheme();e
 
 /* ================= Sign in / Create account ================= */
 var AU={mode:'signin',from:'boot',locked:true,recovery:false,email:''};
-export function openAuth(o){o=o||{};AU={mode:o.mode||'signin',from:o.from||'boot',locked:o.locked!==false,recovery:false,email:''};drawAuth()}
+export function openAuth(o){o=o||{};AU={mode:o.mode||'signin',from:o.from||'boot',locked:o.locked!==false,recovery:false,email:'',notice:o.notice||'',noticeErr:!!o.noticeErr};drawAuth()}
 function fld(id,label,type,attrs,hint){return '<label class="fld"><span>'+label+'</span><input id="'+id+'" type="'+type+'" '+(attrs||'')+(hint?' aria-describedby="'+id+'-h"':'')+'>'+(hint?'<span class="tiny muted fld-h" id="'+id+'-h">'+hint+'</span>':'')+'</label>'}
 var APPLE='<svg viewBox="0 0 24 24" aria-hidden="true" class="oa-ic"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.5-1-2.5-3.6zM14.1 5.6c.6-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.4-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.3z"/></svg>';
 var GOOGLE='<svg viewBox="0 0 24 24" aria-hidden="true" class="oa-ic"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.5l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6 12 6z"/></svg>';
@@ -55,6 +65,7 @@ function drawAuth(){var a=auth(),m=AU.mode,h='';
   h+='<div class="au-hero"><div class="app-ic sm" aria-hidden="true"><span><svg viewBox="0 0 24 24"><path d="M5 16.5l5-5 3.5 3L19.5 8"/></svg></span></div><h1 id="au-title">'+TITLES[m]+'</h1></div>';
   h+='<div class="au-card glass">';
   if(m==='signin'||m==='signup')h+='<div class="seg au-seg" role="tablist" aria-label="Account">'+[['signin','Sign in'],['signup','Create account']].map(function(o){return '<button type="button" role="tab" aria-selected="'+(m===o[0])+'" class="'+(m===o[0]?'on':'')+'" data-act="au" data-au="mode" data-mode="'+o[0]+'" id="au-tab-'+o[0]+'">'+o[1]+'</button>'}).join('')+'</div>';
+  if(AU.notice)h+='<p class="'+(AU.noticeErr?'au-err':'au-ok')+'" id="au-notice" role="status">'+esc(AU.notice)+'</p>';
   h+='<form id="au-form" data-mode="'+m+'" novalidate>';
   if(m==='signin')h+=fld('au-login','Email or username','text','autocomplete="username" autocapitalize="none" spellcheck="false" required')+fld('au-pass','Password','password','autocomplete="current-password" required')+
     '<div class="au-links"><button type="button" class="link-btn" data-act="au" data-au="forgot" id="au-forgot">Forgot password?</button></div>';
@@ -82,7 +93,7 @@ function drawAuth(){var a=auth(),m=AU.mode,h='';
   openSheet(TITLES[m],h,'auth-sheet',AU.locked);$('#auth-sheet').parentNode.classList.add('welcome-back','auth-back');
   if(window.matchMedia&&matchMedia('(hover:hover)').matches){var f=$('#au-form input');if(f)f.focus()}}
 export function auAction(el){var k=el.dataset.au,a=auth();
-  if(k==='mode'){AU.mode=el.dataset.mode;AU.recovery=false;return drawAuth()}
+  if(k==='mode'){AU.mode=el.dataset.mode;AU.recovery=false;AU.notice='';return drawAuth()}
   if(k==='forgot'){AU.mode='forgot';return drawAuth()}
   if(k==='back'){a.cancelMfa&&a.cancelMfa();return openWelcome()}
   if(k==='recovery'){AU.recovery=!AU.recovery;return drawAuth()}

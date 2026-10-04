@@ -114,7 +114,7 @@ function LocalDemoAdapter(){
 function SupabaseAdapter(){
   var sb=null,user=null,pending=false,enroll=null,events=[];
   function emit(e){events.forEach(function(f){f(e)})}
-  function errMsg(e){var m=(e&&e.message)||'Something went wrong';if(/invalid login/i.test(m))return 'Wrong email/username or password';if(/not confirmed/i.test(m))return 'Confirm your email first (check your inbox)';if(/rate limit|too many/i.test(m))return 'Too many attempts. Try again later.';return m}
+  function errMsg(e){var m=(e&&e.message)||'Something went wrong';if(/invalid login/i.test(m))return 'Wrong email/username or password';if(/not confirmed/i.test(m))return 'Confirm your email first (check your inbox)';if(/rate limit|too many/i.test(m))return 'Too many attempts. Try again later.';if(/failed to fetch|networkerror|load failed|network request failed/i.test(m))return 'Can\'t reach the server. Check your connection and try again.';return m}
   async function load(){if(sb)return sb;var mod=await import(SUPABASE_CDN);sb=mod.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
     sb.auth.onAuthStateChange(function(ev){if(ev==='PASSWORD_RECOVERY')emit('recovery')});return sb}
   async function refresh(){var s=(await sb.auth.getSession()).data.session;if(!s){user=null;pending=false;return null}
@@ -166,7 +166,8 @@ function SupabaseAdapter(){
 }
 
 var adapter=null;
-export function auth(){if(!adapter)adapter=SUPABASE_URL&&SUPABASE_ANON_KEY?SupabaseAdapter():LocalDemoAdapter();return adapter}
+/* window.__TJ_FORCE_LOCAL is set only by the automated tests (init script) so they never touch the real project */
+export function auth(){if(!adapter)adapter=SUPABASE_URL&&SUPABASE_ANON_KEY&&!(typeof window!=='undefined'&&window.__TJ_FORCE_LOCAL===true)?SupabaseAdapter():LocalDemoAdapter();return adapter}
 export function testMode(){return auth().kind==='local'}
 
 /* =================== QR code (byte mode, ECC M, versions 1–40) — no dependencies =================== */
