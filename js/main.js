@@ -12,6 +12,7 @@ import { firmEditRow, downscale, handleJson, imp, impApply, impFiles, impSkip, i
 import { demoData } from './demo.js';
 import { DATE_SOURCES, exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandidates, undoImport } from './imports.js';
 import { openOnboarding, openWelcome, obAction } from './onboarding.js';
+import { ACC_ACTS, ACC_CHANGE, ACC_ON, ACC_SUBMIT, bootAccount, syncTheme } from './account.js';
 import { rPayouts, openPayout, savePayout, deletePayout, payAcctChanged, setNextEligible, payCalc, setPayMode } from './payouts.js';
 
 /* Count-up for headline totals. The element's real text is always the final value (screen readers,
@@ -52,11 +53,11 @@ export var A={
    if(!confirm('Move '+c.length+' import'+(c.length===1?'':'s')+' to the date stored in the photo?\n'+c.map(function(i){return (i.fileName||'import')+': '+i.date+' → '+i.photoDate}).join('\n')))return;
    var ok=0,skip=[];c.forEach(function(im){var pl=planMove(im.id,im.photoDate);if(pl.conflicts.length){skip.push(im.fileName||im.date);return}moveImport(im.id,im.photoDate);S.imports.find(function(x){return x.id===im.id}).dateSource='photo';ok++});
    save();render();toast(ok+' moved to photo date'+(skip.length?', '+skip.length+' skipped (date conflict)':''))},
- seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
+ seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();syncTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
    if(s==='scope')ui.scope=v==='all'?'both':v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
  calcStep:function(el){var p=$('#proj-net'),f=p&&moneyOf(p.textContent);tap();calcStep(el.dataset.k,+el.dataset.d);countUp($('#proj-net'),f)},
  calcReset:function(){calcReset();toast('Scenario cleared')},
- theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Appearance: '+appearanceName())},
+ theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();syncTheme();toast('Appearance: '+appearanceName())},
  accent:function(el){setAccent(el.dataset.val)},
  obBack:function(){obAction({dataset:{ob:'back'}})},
  settings:function(){openSettings()},closeSheet:closeSheet,
@@ -129,7 +130,10 @@ ui.acctGroup=null;ui.journalMore=false;
 document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='calc-adv'&&!!cv().adv!==e.target.open){cv().adv=e.target.open;saveUi()}},true);
 window.TJ={calc:function(){return calcMath()},record:function(sc){var r=scopeRecord(sc);return {w:r.w,l:r.l,be:r.be,wr:r.wr,trading:r.trading,noTrading:r.noTrading}},scope:function(){return ui.scope},state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
 render();
-if(!S.onboarded)openWelcome();
+/* accounts: actions, inputs and forms from account.js; routing (welcome → sign in → setup, or straight to the app) */
+Object.assign(A,ACC_ACTS);Object.assign(ON,ACC_ON);Object.assign(CHANGE_ONLY,ACC_CHANGE);
+document.addEventListener('submit',function(e){var f=ACC_SUBMIT[e.target.id];if(f){e.preventDefault();f(e.target)}});
+bootAccount();
 /* ---- drag-and-drop + paste for screenshot imports ----
    Import sheet open: the whole sheet accepts files (drop zone highlights). Accounts / Journal with no sheet open:
    drop anywhere → a full-page target appears → the import sheet opens with the files queued. Elsewhere file drops are
@@ -149,7 +153,7 @@ document.addEventListener('paste',function(e){var cd=e.clipboardData;if(!cd||!dr
   if(!fs.length&&cd.items)Array.prototype.forEach.call(cd.items,function(it){if(it.kind==='file'){var f=it.getAsFile();if(isImageFile(f))fs.push(f)}});
   if(!fs.length)return;/* plain text paste stays untouched */e.preventDefault();impFiles(fs.map(function(f,i){return f.name&&f.name!=='image.png'?f:new File([f],'Pasted '+todayS()+(fs.length>1?' '+(i+1):'')+'.png',{type:f.type||'image/png',lastModified:Date.now()})}))});
 /* accent theme: one shared setting (welcome page + Settings), applied live to every token */
-function setAccent(v){ui.accent=v;saveUi();applyTheme();$$('[data-act=accent]').forEach(function(b){var on=b.dataset.val===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on);b.tabIndex=on?0:-1})}
+function setAccent(v){ui.accent=v;saveUi();applyTheme();syncTheme();$$('[data-act=accent]').forEach(function(b){var on=b.dataset.val===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on);b.tabIndex=on?0:-1})}
 /* radio-group keys for the swatches: arrows move + select (roving tabindex) */
 document.addEventListener('keydown',function(e){var b=e.target.closest&&e.target.closest('[data-act=accent]');if(!b)return;var d={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key];if(!d)return;e.preventDefault();
   var all=$$('[data-act=accent]',b.parentNode),n=all[(all.indexOf(b)+d+all.length)%all.length];setAccent(n.dataset.val);n.focus()});

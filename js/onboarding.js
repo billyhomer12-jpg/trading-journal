@@ -6,6 +6,7 @@ import { liveAccts } from './model.js';
 import { openSheet, closeSheet, toast, info, themePicker } from './ui.js';
 import { render } from './main.js';
 import { demoData } from './demo.js';
+import { afterWelcome } from './account.js';
 
 function firmRow(f, checked){
   return '<div class="row ob-firm" style="margin-bottom:6px" data-orig="'+esc(f.name||'')+'"><input type="checkbox" data-role="use"'+(checked?' checked':'')+' aria-label="Use firm"><input data-role="fname" value="'+esc(f.name||'')+'" placeholder="Firm name" style="flex:2"><input data-role="fbuf" type="number" inputmode="decimal" min="0" value="'+(f.buffer!=null?f.buffer:'')+'" placeholder="Buffer $" style="flex:1"></div>'}
@@ -57,7 +58,7 @@ function apply(withDemo){
   save();closeSheet();render();toast(withDemo?'Demo data loaded':'You\'re all set');return true}
 export function obAction(el){var k=el.dataset.ob;
   if(k==='addFirm'){$('#ob-firms').insertAdjacentHTML('beforeend',firmRow({name:'',buffer:''},true));var i=$$('#ob-firms [data-role=fname]');i[i.length-1].focus();return}
-  if(k==='next')return openOnboarding(false);
+  if(k==='next')return afterWelcome();
   if(k==='back'){draft=grab();return openWelcome()}
   if(k==='start')return apply(false);
   if(k==='demo')return apply(true)}
