@@ -5,7 +5,7 @@ import { S, defaults, normalize, riskUsd, save, saveUi, setState, targetUsd, ui 
 import { acctById, allowedTransitions, createBehavior, reindexLineup, stopOf, transition } from './model.js';
 import { parseImport } from './importer.js';
 import { applyTheme, closeSheet, openSheet, seg, toast } from './ui.js';
-import { rAccounts, rJournal, rOverview, JOURNAL_RECENT } from './views.js';
+import { rAccounts, rJournal, rOverview, JOURNAL_RECENT, jMonth } from './views.js';
 import { rCalc, scenInputs, scenOut, calcPaint, calcStep, calcReset, calcMath, cv, CALC_LIM } from './calc.js';
 import { newsState, rNews, refreshNews, setNews } from './news.js';
 import { firmEditRow, downscale, handleJson, imp, impApply, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
@@ -53,7 +53,7 @@ export var A={
    var ok=0,skip=[];c.forEach(function(im){var pl=planMove(im.id,im.photoDate);if(pl.conflicts.length){skip.push(im.fileName||im.date);return}moveImport(im.id,im.photoDate);S.imports.find(function(x){return x.id===im.id}).dateSource='photo';ok++});
    save();render();toast(ok+' moved to photo date'+(skip.length?', '+skip.length+' skipped (date conflict)':''))},
  seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
-   if(s==='view')ui.view=v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
+   if(s==='view')ui.view=v;else if(s==='calcmode')ui.calc.mode=v;else if(s==='jscope')ui.jscope=v;saveUi();render()},
  calcStep:function(el){var p=$('#proj-net'),f=p&&moneyOf(p.textContent);tap();calcStep(el.dataset.k,+el.dataset.d);countUp($('#proj-net'),f)},
  calcReset:function(){calcReset();toast('Scenario cleared')},
  theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Theme: '+ui.theme)},
@@ -73,6 +73,10 @@ export var A={
  fillAll:function(el){var c=el.closest('.trade-card'),v=$('[data-role=fillv]',c).value;$$('input[data-acct]',c).forEach(function(i){i.value=v});updateBE(c)},
  chip:function(el){el.classList.toggle('on')},
  saveDay:saveDay,
+ jcalNav:function(el){var ym=jMonth(),d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+el.dataset.dir),1);ui.jcal=d.getFullYear()+'-'+pad(d.getMonth()+1);saveUi();render();var b=document.querySelector('[data-act=jcalNav][data-dir="'+el.dataset.dir+'"]');if(b)b.focus({preventScroll:true})},
+ jcalDay:function(el){var d=el.dataset.date;if(!S.trades.some(function(t){return t.date===d})){openDay(d);return}
+   var card=document.querySelector('.day[data-day="'+d+'"]');if(!card&&!ui.journalMore){ui.journalMore=true;saveUi();render();card=document.querySelector('.day[data-day="'+d+'"]')}
+   if(!card){openDay(d);return}card.scrollIntoView({behavior:reduceMotion()?'auto':'smooth',block:'center'});card.classList.remove('flash');void card.offsetWidth;card.classList.add('flash');var eb=card.querySelector('.day-edit');if(eb)eb.focus({preventScroll:true})},
  journalMore:function(){ui.journalMore=true;saveUi();render();var d=document.querySelectorAll('#view .day')[JOURNAL_RECENT];if(d){var b=d.querySelector('button');if(b)b.focus({preventScroll:true})}},
  createBeh:function(el){if(createBehavior(el.dataset.label)){save();render();toast('Box created')}},
  dismissBeh:function(el){S.dismissedBehaviors.push(norm(el.dataset.label));save();render()},

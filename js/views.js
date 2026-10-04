@@ -1,7 +1,7 @@
 // views.js
 import { cls, ds, esc, fmt$, fmtDate, fmtK, norm, pad, r2, todayS } from './util.js';
 import { S, firmBuf, load, ui } from './state.js';
-import { acctById, acctLabel, activeAccts, allowedTransitions, byLineup, cushionOf, dayMap, inView, liveAccts, record, refreshPending, stopOf, tradePnl, transition } from './model.js';
+import { acctById, acctLabel, activeAccts, allowedTransitions, byLineup, cushionOf, dayMap, dayRecord, GRADE_ORDER, inView, liveAccts, record, refreshPending, stopOf, tradePnl, transition } from './model.js';
 import { seg, ICON } from './ui.js';
 import { dateSourceLabel, importAcctIds, importDayPnl, importsByDate } from './imports.js';
 import { openDay, openImport } from './editors.js';
@@ -81,9 +81,33 @@ export function acctCard(a){
    '<details class="acct-more" data-k="more"><summary class="small">Balance history ('+a.history.length+') &amp; actions</summary><div class="hist" data-k="hist">'+a.history.slice().reverse().map(function(x){return '<div><span>'+x.date+' <span class="muted tiny">'+(x.src||'')+'</span></span><b>'+fmt$(x.balance)+'</b></div>'}).join('')+'</div>'+
    '<div class="row wrap" style="margin-top:10px">'+tr+'<button class="btn sm danger" data-act="removeAcct" data-id="'+a.id+'">Remove</button></div><div class="tiny muted" style="margin-top:6px">Balances change only through Import balances. Status changes are one-way.</div></details></div>'}
 export var JOURNAL_RECENT=5;
+/* Journal: Win / loss record + trade-grades calendar (scope: funded | evaluation | all) */
+export var JSCOPE={funded:{cap:'Trading days for funded accounts',rec:'Funded win / loss record',gh:'Funded trade grades',gs:'Only funded entries are shown'},
+  evaluation:{cap:'Trading days for evaluation accounts',rec:'Evaluation win / loss record',gh:'Evaluation trade grades',gs:'Only evaluation entries are shown'},
+  all:{cap:'Trading days across all accounts',rec:'All-time win / loss record',gh:'All trade grades',gs:'Funded and evaluation entries are shown'}};
+export function jScope(){return JSCOPE[ui.jscope]?ui.jscope:'funded'}
+export function jMonth(){var now=new Date();return /^\d{4}-\d{2}$/.test(ui.jcal||'')?ui.jcal:now.getFullYear()+'-'+pad(now.getMonth()+1)}
+function plu(n,w){return n+' '+w+(n===1?'':'s')}
+export function rWinLoss(){var sc=jScope(),L=JSCOPE[sc],R=dayRecord(sc);
+  var h='<div class="wl-head" id="wl-head"><div><h2 class="sec-h">Win / loss</h2><p class="sec-cap" id="wl-cap">'+L.cap+'</p></div><button class="round-add sm" data-act="openDay" data-date="'+todayS()+'" id="btn-log-round" aria-label="Log today">'+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>';
+  h+=seg('jscope',[['funded','Funded'],['evaluation','Evaluation'],['all','All-time']],sc).replace('class="seg"','class="seg" id="wl-seg"');
+  h+='<section class="card glass wl-card" id="wl-card"><div class="wl-split"><div class="wl-rec"><div class="wl-l" id="wl-rec-l">'+L.rec+'</div><div class="wl-big mono" id="wl-rec" style="--len:'+(R.w+'W — '+R.l+'L — '+R.be+'BE').length+'" aria-label="'+R.w+' wins, '+R.l+' losses, '+R.be+' break-even"><span class="pos">'+R.w+'W</span><span class="wl-sep"> — </span><span class="neg">'+R.l+'L</span><span class="wl-sep"> — </span><span class="amb">'+R.be+'BE</span></div></div>'+
+    '<div class="wl-rate"><div class="wl-l">Win rate</div><div class="wl-big mono" id="wl-wr">'+(R.wr==null?'—':Math.round(R.wr*100)+'%')+'</div></div></div>'+
+    '<div class="wl-foot tiny muted" id="wl-foot">'+plu(R.trading,'trading day')+' · '+plu(R.noTrading,'no-trading day')+' · break-even excluded from win rate</div></section>';
+  h+='<div class="gr-head" id="gr-head"><h2 class="sec-h" id="gr-h">'+L.gh+'</h2><div class="gr-sub"><span class="sec-cap" id="gr-sub">'+L.gs+'</span><span class="sec-cap">Tap a day to view or edit</span></div></div>';
+  return h+rGradeCal(R)}
+export function rGradeCal(R){var ym=jMonth(),y=+ym.slice(0,4),m=+ym.slice(5,7)-1,first=new Date(y,m,1),lead=first.getDay(),dim=new Date(y,m+1,0).getDate(),tS=todayS();
+  var h='<section class="card glass jcal" id="jcal" data-month="'+ym+'"><div class="jcal-head"><button class="jcal-nav" data-act="jcalNav" data-dir="-1" aria-label="Previous month">'+ICON.chevL+'</button><div class="jcal-m" id="jcal-month">'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</div><button class="jcal-nav" data-act="jcalNav" data-dir="1" aria-label="Next month">'+ICON.chevR+'</button></div>';
+  h+='<div class="jcal-grid" role="grid">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(x){return '<div class="jcal-dow mono" role="columnheader">'+x+'</div>'}).join('');
+  for(var i=0;i<lead;i++)h+='<div class="jcal-cell pad" aria-hidden="true"></div>';
+  for(var j=1;j<=dim;j++){var s=y+'-'+pad(m+1)+'-'+pad(j),e=R.map[s],fut=s>tS,g=e?e.worst:'',all=e?e.grades.slice().sort(function(a,b){return GRADE_ORDER[a]-GRADE_ORDER[b]}):[];
+    var lab=new Date(y,m,j).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+(e?': '+plu(e.trades,'trade')+(all.length?', grade'+(all.length>1?'s ':' ')+all.join(', ')+(all.length>1?' (worst '+g+')':''):', no grade')+', '+(e.res==='W'?'win':e.res==='L'?'loss':'break-even')+' day':(fut?'':': no trades — tap to log'));
+    h+='<button class="jcal-cell'+(e?' has'+(g?' g-'+g:''):'')+(s===tS?' today':'')+'" data-act="jcalDay" data-date="'+s+'" data-grade="'+g+'" data-grades="'+all.join('')+'" aria-label="'+esc(lab)+'"'+(fut&&!e?' disabled':'')+'><span class="jd mono">'+j+'</span>'+(e?'<span class="jg mono">'+(g||'·')+'</span>'+(new Set(all).size>1?'<span class="jg-all mono">'+all.join(' ')+'</span>':''):'')+'</button>'}
+  var tail=(7-(lead+dim)%7)%7;for(var t=0;t<tail;t++)h+='<div class="jcal-cell pad" aria-hidden="true"></div>';
+  return h+'</div></section>'}
 export function rJournal(){
   refreshPending();
-  var h='<button class="btn primary wide" data-act="openDay" data-date="'+todayS()+'" id="btn-log-today">+ Log / edit today</button>';
+  var h='<button class="btn primary wide" data-act="openDay" data-date="'+todayS()+'" id="btn-log-today">+ Log / edit today</button>'+rWinLoss();
   var counts={};S.behaviors.forEach(function(b){counts[b]=0});S.trades.forEach(function(t){t.tags.forEach(function(g){if(g in counts)counts[g]++})});
   h+='<section class="card glass" id="patterns"><h2>Patterns in my notes · all-time</h2><div class="behs">'+S.behaviors.map(function(b){return '<div class="beh" data-beh="'+esc(b)+'"><div class="c mono" data-k="count">'+counts[b]+'</div><div class="t">'+esc(b)+'</div></div>'}).join('')+'</div>';
   var props=S.pendingBehaviors.filter(function(p){return p.count>=2&&S.dismissedBehaviors.indexOf(norm(p.label))<0});

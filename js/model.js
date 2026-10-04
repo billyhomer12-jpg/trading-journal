@@ -34,6 +34,21 @@ export function tradePnl(t,view){return r2(t.entries.reduce(function(s,e){return
 export function tradeInView(t,view){return t.entries.some(function(e){return inView(e.type,view)})}
 export function record(view){var w=0,l=0,be=0;S.trades.forEach(function(t){if(!tradeInView(t,view))return;if(t.be){be++;return}var p=tradePnl(t,view);if(p>0)w++;else if(p<0)l++});return {w:w,l:l,be:be,wr:(w+l)?w/(w+l):null}}
 export function dayMap(view){var m={};S.trades.forEach(function(t){if(!tradeInView(t,view))return;var d=m[t.date]||(m[t.date]={pnl:0,n:0});d.pnl=r2(d.pnl+tradePnl(t,view));d.n++});return m}
+/* Journal win/loss record, counted per TRADING DAY for a scope (funded | evaluation | all).
+   A day's result uses only the scope's entries of its non-BE trades: >0 W, <0 L; a day whose trades are all BE
+   (or net exactly 0) is BE. Win rate = W / (W + L) — break-even excluded. No-trading days = weekdays from the first
+   trading day in scope through today (today only once it has trades) with no trades in scope. */
+export var GRADE_ORDER={A:1,B:2,C:3,D:4};
+export function scopeView(scope){return scope==='all'?'both':scope}
+export function dayRecord(scope,today){var view=scopeView(scope),m={};today=today||todayS();
+  S.trades.forEach(function(t){if(!tradeInView(t,view))return;var d=m[t.date]||(m[t.date]={date:t.date,pnl:0,trades:0,nonBE:0,grades:[]});d.trades++;
+    if(!t.be){d.nonBE++;d.pnl=r2(d.pnl+tradePnl(t,view))}if(t.grade)d.grades.push(t.grade)});
+  var w=0,l=0,be=0,days=Object.keys(m).sort();
+  days.forEach(function(k){var d=m[k];d.res=d.nonBE&&d.pnl>0?'W':d.nonBE&&d.pnl<0?'L':'BE';if(d.res==='W')w++;else if(d.res==='L')l++;else be++;
+    d.worst=d.grades.slice().sort(function(a,b){return GRADE_ORDER[b]-GRADE_ORDER[a]})[0]||''});
+  var noT=0;if(days.length){var cur=new Date(days[0]+'T12:00:00'),end=new Date(today+'T12:00:00');if(!m[today])end.setDate(end.getDate()-1);
+    while(cur<=end){var dw=cur.getDay(),k=cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');if(dw&&dw!==6&&!m[k])noT++;cur.setDate(cur.getDate()+1)}}
+  return {map:m,w:w,l:l,be:be,trading:days.length,noTrading:noT,wr:(w+l)?w/(w+l):null}}
 export function suggestBE(entries){if(!entries.length)return false;var avg=entries.reduce(function(s,e){return s+e.pnl},0)/entries.length;return Math.abs(avg)<=S.settings.beThreshold}
 export function refreshPending(){
   var known={};S.behaviors.forEach(function(b){known[norm(b)]=1});

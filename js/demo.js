@@ -14,7 +14,8 @@ export function demoData(){
   var notes=['Waited for the retest, clean fill.','Took it early before confirmation.','Fought the magnet line into VWAP.','Hesitated on the A+, got in late.','Chased after missing the first move.','Textbook setup, held to target.','Scratched it at entry — flat.','Over-filtered and missed the clean entry.'];
   var trades=[];
   var wdays=[];for(var wi=0;wi<=48;wi++){var wd_=addDays(t0,wi).getDay();if(wd_&&wd_!==6)wdays.push(wi)}var beDi=wdays[wdays.length-3]; /* a break-even trade 3 trading days ago */
-  for(var di=0;di<=48;di++){var d=addDays(t0,di),dw=d.getDay();if(dw===0||dw===6)continue;var dS=ds(d);
+  var noTrade=[wdays[4],wdays[11],wdays[19]]; /* three older weekdays without trading (no-trading days) */
+  for(var di=0;di<=48;di++){var d=addDays(t0,di),dw=d.getDay();if(dw===0||dw===6||noTrade.indexOf(di)>=0)continue;var dS=ds(d);
     var live=accts.filter(function(a){return di>=a.from&&!(a.end&&di>a.end[1])});var nT=rnd()<.35?2:1;
     for(var k=0;k<nT;k++){var r=rnd(),kind=(di===beDi&&k===nT-1)?'B':r<.52?'W':r<.8?'L':r<.9?'B':'P',entries=[],pp=Math.round(150+rnd()*300)*(rnd()<.5?-1:1);
       live.forEach(function(a){if(a.type!=='funded'&&rnd()<.15)return;var p=kind==='W'?750:kind==='L'?-500:kind==='B'?Math.round(rnd()*30-15):pp;

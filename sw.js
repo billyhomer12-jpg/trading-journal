@@ -1,7 +1,7 @@
 /* Service worker: offline app shell for the web/PWA build of app/.
    Cache-first for same-origin files, refreshed in the background; cross-origin requests (e.g. the Forex Factory feed) are never cached here.
    VERSION is stamped by build.js from a hash of the app files so updates roll out automatically. */
-const VERSION = 'tj-61e16659bc5b';
+const VERSION = 'tj-4b06be10cc4b';
 const SHELL = ['./', './index.html', './manifest.json', './css/styles.css',
   './js/main.js', './js/config.js', './js/util.js', './js/state.js', './js/model.js', './js/importer.js', './js/imports.js', './js/ui.js', './js/views.js',
   './js/calc.js', './js/news.js', './js/payouts.js', './js/editors.js', './js/onboarding.js', './js/demo.js',
