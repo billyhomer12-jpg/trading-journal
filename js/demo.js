@@ -4,6 +4,7 @@ import { addDays, clone, ds } from './util.js';
 import { S, defaults, recompute, setState } from './state.js';
 import { refreshPending } from './model.js';
 
+function tradePnl_(t){return t.entries.reduce(function(s,e){return s+e.pnl},0)}
 export function demoData(){
   var st=defaults();st.demo=true;st.onboarded=true;st.settings=clone(S.settings);var seed=20261003;var rnd=function(){seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296};
   var today=new Date(),t0=addDays(new Date(today.getFullYear(),today.getMonth(),today.getDate()),-48);
@@ -12,9 +13,10 @@ export function demoData(){
   var accts=defs.map(function(d,i){return {id:'demo'+i,name:d[0],firm:d[1],type:d[2],status:'active',startBalance:25000,lineupIndex:i,history:[{date:ds(addDays(t0,d[3])),balance:25000,src:'start'}],events:[],from:d[3],end:d[4],bal:25000}});
   var notes=['Waited for the retest, clean fill.','Took it early before confirmation.','Fought the magnet line into VWAP.','Hesitated on the A+, got in late.','Chased after missing the first move.','Textbook setup, held to target.','Scratched it at entry — flat.','Over-filtered and missed the clean entry.'];
   var trades=[];
+  var wdays=[];for(var wi=0;wi<=48;wi++){var wd_=addDays(t0,wi).getDay();if(wd_&&wd_!==6)wdays.push(wi)}var beDi=wdays[wdays.length-3]; /* a break-even trade 3 trading days ago */
   for(var di=0;di<=48;di++){var d=addDays(t0,di),dw=d.getDay();if(dw===0||dw===6)continue;var dS=ds(d);
     var live=accts.filter(function(a){return di>=a.from&&!(a.end&&di>a.end[1])});var nT=rnd()<.35?2:1;
-    for(var k=0;k<nT;k++){var r=rnd(),kind=r<.52?'W':r<.8?'L':r<.9?'B':'P',entries=[],pp=Math.round(150+rnd()*300)*(rnd()<.5?-1:1);
+    for(var k=0;k<nT;k++){var r=rnd(),kind=(di===beDi&&k===nT-1)?'B':r<.52?'W':r<.8?'L':r<.9?'B':'P',entries=[],pp=Math.round(150+rnd()*300)*(rnd()<.5?-1:1);
       live.forEach(function(a){if(a.type!=='funded'&&rnd()<.15)return;var p=kind==='W'?750:kind==='L'?-500:kind==='B'?Math.round(rnd()*30-15):pp;
         if(a.end&&a.end[0]==='blown'&&di>=a.end[1]-4)p=-500;entries.push({accountId:a.id,pnl:p,type:a.type});a.bal+=p});
       if(!entries.length)continue;
@@ -22,8 +24,13 @@ export function demoData(){
       var tags=[];if(ni===3)tags.push(DEFAULT_BEHAVIORS[0]);if(ni===4)tags.push(DEFAULT_BEHAVIORS[1]);if(ni===2)tags.push(DEFAULT_BEHAVIORS[2]);if(ni===7)tags.push(DEFAULT_BEHAVIORS[3]);
       trades.push({id:'dt'+trades.length,date:dS,entries:entries,grade:kind==='W'?(rnd()<.6?'A':'B'):kind==='L'?['B','C','D'][Math.floor(rnd()*3)]:'C',notes:notes[ni],be:kind==='B',beManual:false,tags:tags,custom:[]})}
     live.forEach(function(a){var last=a.history[a.history.length-1];if(last.date===dS)last.balance=a.bal;else a.history.push({date:dS,balance:a.bal,src:'demo'})})}
-  trades.filter(function(t){return /Chased/.test(t.notes)}).slice(0,2).forEach(function(t){t.custom.push('Chased the open')});
-  var lm=trades.filter(function(t){return /early/.test(t.notes)});if(lm[0])lm[0].custom.push('Moved stop early');
+  /* deterministic demo patterns: Hesitated 3 · Forced 2 · Magnet 6 · Filters 2 on the newest losing/partial trades,
+     plus custom labels "Chased the open" ×2 (→ box suggestion) and "Moved stop early" ×1 (pending) */
+  var PNOTE={0:'Hesitated on the A+, got in late.',1:'Chased after missing the first move — forced one.',2:'Fought the magnet line into VWAP.',3:'Over-filtered and missed the clean entry.'};
+  trades.forEach(function(t){t.tags=[];if(!t.be&&/Hesitated|Chased|magnet|filtered/.test(t.notes))t.notes=tradePnl_(t)<0?'Took it early before confirmation.':'Waited for the retest, clean fill.'});
+  var newest=trades.length?trades[trades.length-1].date:'',cand=trades.filter(function(t){return !t.be&&tradePnl_(t)<0}).reverse().concat(trades.filter(function(t){return !t.be&&tradePnl_(t)>=0&&t.date!==newest}).reverse()),seq=[2,0,2,1,2,0,3,2,0,1,2,3,2];
+  seq.forEach(function(bi,i){var t=cand[i];if(!t)return;t.tags=[DEFAULT_BEHAVIORS[bi]];t.notes=PNOTE[bi]});
+  var rest=cand.slice(seq.length);[['Chased the open',rest[0]],['Chased the open',rest[1]],['Moved stop early',rest[2]]].forEach(function(x){if(x[1]){x[1].custom.push(x[0]);x[1].notes=x[0]==='Moved stop early'?'Moved my stop to break-even too early.':'Chased the open, no setup.'}});
   accts.forEach(function(a){if(a.end){a.status=a.end[0];a.events.push({date:ds(addDays(t0,a.end[1])),what:a.end[0]})}delete a.from;delete a.end;delete a.bal;recompute(a)});
   st.accounts=accts;st.trades=trades;st.lastImportDate=ds(today);
   /* demo payouts (records only — balances above are untouched) */

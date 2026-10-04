@@ -5,8 +5,8 @@ import { S, defaults, normalize, riskUsd, save, saveUi, setState, targetUsd, ui 
 import { acctById, allowedTransitions, createBehavior, reindexLineup, stopOf, transition } from './model.js';
 import { parseImport } from './importer.js';
 import { applyTheme, closeSheet, openSheet, seg, toast } from './ui.js';
-import { rAccounts, rJournal, rOverview } from './views.js';
-import { rCalc, scenInputs, scenOut } from './calc.js';
+import { rAccounts, rJournal, rOverview, JOURNAL_RECENT } from './views.js';
+import { rCalc, scenInputs, scenOut, calcPaint, calcStep, calcReset, calcMath, cv, CALC_LIM } from './calc.js';
 import { newsState, rNews, refreshNews, setNews } from './news.js';
 import { firmEditRow, downscale, handleJson, imp, impApply, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
 import { demoData } from './demo.js';
@@ -14,14 +14,29 @@ import { exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandi
 import { openOnboarding, obAction } from './onboarding.js';
 import { rPayouts, openPayout, savePayout, deletePayout, payAcctChanged, setNextEligible, payCalc, setPayMode } from './payouts.js';
 
+/* Count-up for headline totals. The element's real text is always the final value (screen readers,
+   copy/paste and tests read it); the animated figure is painted by ::after from data-cu while .cu hides the text. */
+var lastTab=null,cuRuns=new WeakMap();
+export function reduceMotion(){return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)}
+export function countUp(el,from){if(!el||reduceMotion())return;var txt=el.textContent,m=txt.match(/^([+−-]?)\$([\d,]+(?:\.\d+)?)$/);if(!m)return;
+  var sign=m[1]==='+'?1:m[1]?-1:1,to=sign*parseFloat(m[2].replace(/,/g,'')),dec=(m[2].split('.')[1]||'').length,f0=from==null?0:from;if(f0===to)return;
+  var t0=performance.now(),dur=Math.min(700,320+Math.log10(Math.abs(to-f0)+1)*70),plus=m[1]==='+';
+  el.style.setProperty('--cu-c',getComputedStyle(el).color);el.classList.add('cu');cuRuns.set(el,t0);
+  function fm(v){var a=Math.abs(v),s=a.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});return (v<0?'−':plus&&v>0?'+':'')+'$'+s}
+  (function step(now){if(cuRuns.get(el)!==t0)return;var k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,3),v=f0+(to-f0)*e;el.setAttribute('data-cu',fm(dec?v:Math.round(v)));
+    if(k<1)requestAnimationFrame(step);else{el.classList.remove('cu');el.removeAttribute('data-cu')}})(t0)}
+export function moneyOf(t){var m=String(t||'').match(/^([+−-]?)\$([\d,]+(?:\.\d+)?)$/);return m?(m[1]==='−'||m[1]==='-'?-1:1)*parseFloat(m[2].replace(/,/g,'')):null}
+export function tap(){try{if(navigator.vibrate&&!reduceMotion())navigator.vibrate(6)}catch(e){}}
 export function render(){
   applyTheme();$('#demo-badge').hidden=!S.demo;
   $$('#tabbar button').forEach(function(b){var on=b.dataset.tab===ui.tab;b.classList.toggle('on',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   var v=$('#view');var f={overview:rOverview,accounts:rAccounts,journal:rJournal,calculator:rCalc,payouts:rPayouts,news:rNews}[ui.tab]||rOverview;
-  v.innerHTML=f();v.setAttribute('data-tab',ui.tab);
+  var tabChanged=lastTab!==ui.tab;lastTab=ui.tab;
+  v.innerHTML=f();v.setAttribute('data-tab',ui.tab);if(ui.tab==='calculator')calcPaint();
+  if(tabChanged){v.classList.remove('enter');void v.offsetWidth;v.classList.add('enter');$$('#view [data-count]').forEach(function(el){countUp(el)})}
 }
 export var A={
- tab:function(el){var t=el.dataset.tab;ui.acctGroup=null;ui.tab=t;saveUi();render();window.scrollTo(0,0)}, /* tapping a tab (incl. the current one) returns to its top level */
+ tab:function(el){var t=el.dataset.tab;ui.acctGroup=null;ui.journalMore=false;ui.tab=t;saveUi();render();window.scrollTo(0,0)}, /* tapping a tab (incl. the current one) returns to its top level */
  openGroup:function(el){ui.acctGroup=el.dataset.group;render();window.scrollTo(0,0);var b=$('#btn-back');if(b)b.focus({preventScroll:true})},
  closeGroup:function(){var g=ui.acctGroup;ui.acctGroup=null;render();window.scrollTo(0,0);var c=$('#grp-'+g);if(c)c.focus({preventScroll:true})},
  undoImport:function(el){var im=S.imports.find(function(x){return x.id===el.dataset.id});if(!im)return;var n=im.lines.filter(function(l){return l.accountId}).length;
@@ -39,6 +54,8 @@ export var A={
    save();render();toast(ok+' moved to photo date'+(skip.length?', '+skip.length+' skipped (date conflict)':''))},
  seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
    if(s==='view')ui.view=v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
+ calcStep:function(el){var p=$('#proj-net'),f=p&&moneyOf(p.textContent);tap();calcStep(el.dataset.k,+el.dataset.d);countUp($('#proj-net'),f)},
+ calcReset:function(){calcReset();toast('Scenario cleared')},
  theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Theme: '+ui.theme)},
  settings:function(){openSettings()},closeSheet:closeSheet,
  sheetBack:function(el,e){if(e.target===el&&!el.dataset.lock)closeSheet()},
@@ -56,7 +73,7 @@ export var A={
  fillAll:function(el){var c=el.closest('.trade-card'),v=$('[data-role=fillv]',c).value;$$('input[data-acct]',c).forEach(function(i){i.value=v});updateBE(c)},
  chip:function(el){el.classList.toggle('on')},
  saveDay:saveDay,
- journalMore:function(){ui.journalMore=true;render()},
+ journalMore:function(){ui.journalMore=true;saveUi();render();var d=document.querySelectorAll('#view .day')[JOURNAL_RECENT];if(d){var b=d.querySelector('button');if(b)b.focus({preventScroll:true})}},
  createBeh:function(el){if(createBehavior(el.dataset.label)){save();render();toast('Box created')}},
  dismissBeh:function(el){S.dismissedBehaviors.push(norm(el.dataset.label));save();render()},
  openImport:function(){openImport()},impPreview:function(){impPreview(false)},impApply:impApply,
@@ -86,7 +103,7 @@ export var ON={
  dayDate:function(el){if(el.value)openDay(el.value)},
  pnlInput:function(el){updateBE(el.closest('.trade-card'))},
  beToggle:function(el){var c=el.closest('.trade-card');c.dataset.betouched='1';$('[data-role=behint]',c).textContent=''},
- calcN:function(el){ui.calc.n=el.value;saveUi();var n=Math.max(0,+el.value||0);$('#calc-win').textContent=fmt$(n*targetUsd(),true);$('#calc-loss').textContent=fmt$(-n*riskUsd());$('#scen-out').innerHTML=scenOut()},
+ calcSet:function(el){var k=el.dataset.k,L=CALC_LIM[k];if(el.value==='')return;var v=Math.round(+el.value);if(!isFinite(v))return;var c=cv(),x=Math.max(L[0],Math.min(L[1],v));c[k]=x;if(x!==v)el.value=x;saveUi();calcPaint()},
  calcSeq:function(el){ui.calc.seq=el.value;saveUi();$('#scen-out').innerHTML=scenOut()},
  calcDays:function(el){ui.calc.days=el.value;saveUi();$('#scen-in').innerHTML=scenInputs();$('#scen-out').innerHTML=scenOut();$('#calc-days').focus()},
  calcPD:function(el){var c=ui.calc,i=+el.dataset.i;c.perDay=c.perDay||[];c.perDay[i]=c.perDay[i]||{w:0,l:0,b:0};c.perDay[i][el.dataset.k]=+el.value||0;saveUi();$('#scen-out').innerHTML=scenOut()},
@@ -105,8 +122,9 @@ document.addEventListener('click',function(e){var el=e.target.closest('[data-act
 document.addEventListener('input',function(e){var el=e.target,k=el.dataset&&el.dataset.on;if(k&&ON[k]&&!CHANGE_ONLY[k])ON[k](el,e)});
 document.addEventListener('change',function(e){var el=e.target,k=el.dataset&&el.dataset.on;if(k&&ON[k]&&CHANGE_ONLY[k])ON[k](el,e)});
 /* read-only hooks for tests; mutations go through the same guarded functions */
-ui.acctGroup=null;
-window.TJ={state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
+ui.acctGroup=null;ui.journalMore=false;
+document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='calc-adv'&&!!cv().adv!==e.target.open){cv().adv=e.target.open;saveUi()}},true);
+window.TJ={calc:function(){return calcMath()},state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
 render();
 if(!S.onboarded)openOnboarding(false);
 /* keyboard: Esc closes an (unlocked) sheet */

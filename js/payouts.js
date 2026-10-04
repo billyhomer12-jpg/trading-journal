@@ -35,7 +35,7 @@ var WALLET='<svg viewBox="0 0 24 24"><path d="M5 7.5V6.8A2.3 2.3 0 017.3 4.5H17v
 export function rPayouts(){
   var T=payoutTotals(),fa=fundedAccts(),t=todayS();
   /* (1) total withdrawn header + floating + */
-  var h='<section class="pay-hero glass" id="pay-summary"><div class="small muted">Total withdrawn</div><div class="pay-big" id="pay-all">'+fmt$(T.all)+'</div><div class="muted">Across every account in the ledger</div><button class="fab" data-act="openPayout" id="pay-fab" aria-label="Record a payout">+</button></section>';
+  var h='<section class="pay-hero glass" id="pay-summary"><div class="small muted">Total withdrawn</div><div class="pay-big" id="pay-all" data-count>'+fmt$(T.all)+'</div><div class="muted">Across every account in the ledger</div><button class="fab" data-act="openPayout" id="pay-fab" aria-label="Record a payout">+</button></section>';
   /* (2) trader-share note with official rule links */
   h+=shareNote();
   /* (3) record a payout card */
