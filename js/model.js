@@ -32,15 +32,15 @@ export function transition(a,key){
 export function statusLabel(a){return a.removed?'removed':a.status==='active'?(a.type==='funded'?'funded':'evaluation'):a.status}
 export function tradePnl(t,view){return r2(t.entries.reduce(function(s,e){return s+(inView(e.type,view||'both')?e.pnl:0)},0))}
 export function tradeInView(t,view){return t.entries.some(function(e){return inView(e.type,view)})}
-export function record(view){var w=0,l=0,be=0;S.trades.forEach(function(t){if(!tradeInView(t,view))return;if(t.be){be++;return}var p=tradePnl(t,view);if(p>0)w++;else if(p<0)l++});return {w:w,l:l,be:be,wr:(w+l)?w/(w+l):null}}
 export function dayMap(view){var m={};S.trades.forEach(function(t){if(!tradeInView(t,view))return;var d=m[t.date]||(m[t.date]={pnl:0,n:0});d.pnl=r2(d.pnl+tradePnl(t,view));d.n++});return m}
-/* Journal win/loss record, counted per TRADING DAY for a scope (funded | evaluation | all).
+/* THE record (Overview + Journal share it), counted per TRADING DAY for a scope (funded | evaluation | both; legacy 'all' = both).
    A day's result uses only the scope's entries of its non-BE trades: >0 W, <0 L; a day whose trades are all BE
    (or net exactly 0) is BE. Win rate = W / (W + L) — break-even excluded. No-trading days = weekdays from the first
    trading day in scope through today (today only once it has trades) with no trades in scope. */
 export var GRADE_ORDER={A:1,B:2,C:3,D:4};
-export function scopeView(scope){return scope==='all'?'both':scope}
-export function dayRecord(scope,today){var view=scopeView(scope),m={};today=today||todayS();
+export var SCOPES=['funded','evaluation','both'];
+export function scopeView(scope){return scope==='all'?'both':SCOPES.indexOf(scope)>=0?scope:'both'}
+export function scopeRecord(scope,today){var view=scopeView(scope),m={};today=today||todayS();
   S.trades.forEach(function(t){if(!tradeInView(t,view))return;var d=m[t.date]||(m[t.date]={date:t.date,pnl:0,trades:0,nonBE:0,grades:[]});d.trades++;
     if(!t.be){d.nonBE++;d.pnl=r2(d.pnl+tradePnl(t,view))}if(t.grade)d.grades.push(t.grade)});
   var w=0,l=0,be=0,days=Object.keys(m).sort();

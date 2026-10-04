@@ -1,7 +1,7 @@
 // importer.js
 import { $, fmt$, norm, num, pad, r2, uid } from './util.js';
 import { S, recompute, setState } from './state.js';
-import { byLineup, createAccount, record, statusLabel } from './model.js';
+import { byLineup, createAccount, statusLabel } from './model.js';
 
 export function parseDateToken(s){s=String(s).trim().replace(/^date\s*[:=]?\s*/i,'').replace(/[:\s]+$/,'');var m;
   if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)))return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);

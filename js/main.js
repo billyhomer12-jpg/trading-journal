@@ -2,7 +2,7 @@ import { BUILD } from './config.js';
 // main.js
 import { $, $$, clone, ds, esc, fmt$, fmtDate, norm, pad, todayS } from './util.js';
 import { S, defaults, normalize, riskUsd, save, saveUi, setState, targetUsd, ui } from './state.js';
-import { acctById, allowedTransitions, createBehavior, reindexLineup, stopOf, transition } from './model.js';
+import { acctById, allowedTransitions, createBehavior, reindexLineup, scopeRecord, stopOf, transition } from './model.js';
 import { parseImport } from './importer.js';
 import { applyTheme, closeSheet, openSheet, seg, toast } from './ui.js';
 import { rAccounts, rJournal, rOverview, JOURNAL_RECENT, jMonth } from './views.js';
@@ -53,7 +53,7 @@ export var A={
    var ok=0,skip=[];c.forEach(function(im){var pl=planMove(im.id,im.photoDate);if(pl.conflicts.length){skip.push(im.fileName||im.date);return}moveImport(im.id,im.photoDate);S.imports.find(function(x){return x.id===im.id}).dateSource='photo';ok++});
    save();render();toast(ok+' moved to photo date'+(skip.length?', '+skip.length+' skipped (date conflict)':''))},
  seg:function(el){var s=el.dataset.seg,v=el.dataset.val;if(s==='theme'){ui.theme=v;saveUi();applyTheme();$$('[data-seg=theme]').forEach(function(b){b.classList.toggle('on',b.dataset.val===v)});return}
-   if(s==='view')ui.view=v;else if(s==='calcmode')ui.calc.mode=v;else if(s==='jscope')ui.jscope=v;saveUi();render()},
+   if(s==='scope')ui.scope=v==='all'?'both':v;else if(s==='calcmode')ui.calc.mode=v;saveUi();render()},
  calcStep:function(el){var p=$('#proj-net'),f=p&&moneyOf(p.textContent);tap();calcStep(el.dataset.k,+el.dataset.d);countUp($('#proj-net'),f)},
  calcReset:function(){calcReset();toast('Scenario cleared')},
  theme:function(){ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'auto';saveUi();applyTheme();toast('Theme: '+ui.theme)},
@@ -128,7 +128,7 @@ document.addEventListener('change',function(e){var el=e.target,k=el.dataset&&el.
 /* read-only hooks for tests; mutations go through the same guarded functions */
 ui.acctGroup=null;ui.journalMore=false;
 document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='calc-adv'&&!!cv().adv!==e.target.open){cv().adv=e.target.open;saveUi()}},true);
-window.TJ={calc:function(){return calcMath()},state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
+window.TJ={calc:function(){return calcMath()},record:function(sc){var r=scopeRecord(sc);return {w:r.w,l:r.l,be:r.be,wr:r.wr,trading:r.trading,noTrading:r.noTrading}},scope:function(){return ui.scope},state:function(){return clone(S)},undoImport:function(id){var r=undoImport(id);save();render();return r},moveImport:function(id,d){var r=moveImport(id,d);save();render();return r&&{moved:!!r.moved,conflicts:r.conflicts,points:r.points,trades:r.trades.length}},dayPnl:function(id){var im=S.imports.find(function(x){return x.id===id});return im?importDayPnl(im):null},exifDate:function(bytes){return exifDate(new Uint8Array(bytes).buffer)},parseImport:parseImport,stopOf:function(id){return stopOf(acctById(id))},allowedTransitions:function(id){return allowedTransitions(acctById(id)).map(function(t){return t.key})},transition:function(id,k){var r=transition(acctById(id),k);save();render();return r}};
 render();
 if(!S.onboarded)openOnboarding(false);
 /* keyboard: Esc closes an (unlocked) sheet */

@@ -1,18 +1,18 @@
 // views.js
 import { cls, ds, esc, fmt$, fmtDate, fmtK, norm, pad, r2, todayS } from './util.js';
 import { S, firmBuf, load, ui } from './state.js';
-import { acctById, acctLabel, activeAccts, allowedTransitions, byLineup, cushionOf, dayMap, dayRecord, GRADE_ORDER, inView, liveAccts, record, refreshPending, stopOf, tradePnl, transition } from './model.js';
+import { acctById, acctLabel, activeAccts, allowedTransitions, byLineup, cushionOf, dayMap, GRADE_ORDER, inView, liveAccts, refreshPending, scopeRecord, scopeView, stopOf, tradePnl, transition } from './model.js';
 import { seg, ICON, info, icoTxt } from './ui.js';
 import { dateSourceLabel, importAcctIds, importDayPnl, importsByDate } from './imports.js';
 import { openDay, openImport } from './editors.js';
 
 export function rOverview(){
-  var view=ui.view,acts=activeAccts().filter(function(a){return inView(a.type,view)});
-  var total=r2(acts.reduce(function(s,a){return s+a.balance},0)),rec=record(view);
+  var view=curScope(),acts=activeAccts().filter(function(a){return inView(a.type,view)});
+  var total=r2(acts.reduce(function(s,a){return s+a.balance},0)),rec=scopeRecord(view);
   var nf=acts.filter(function(a){return a.type==='funded'}).length,ne=acts.length-nf;
-  var h=seg('view',[['funded','Funded'],['evaluation','Evaluation'],['both','Both']],view);
+  var h=scopeSeg(view,'ov-seg');
   h+='<section class="card glass" id="ov-total"><h2>Total balance</h2><div class="big" id="total-balance" data-count>'+fmt$(total)+'</div><div class="muted small">'+acts.length+' active'+(view==='both'?' · '+nf+' funded · '+ne+' eval':'')+'</div></section>';
-  h+='<section class="card glass" id="ov-record"><h2 class="h-info">All-time record'+info('About the record','Never resets. Break-even trades never count as a win or loss.'+(rec.be?' <b id="rec-str">'+rec.w+'–'+rec.l+'</b> · '+rec.be+' BE.':' <b id="rec-str">'+rec.w+'–'+rec.l+'</b>'),'r')+'</h2><div class="grid4">'+
+  h+='<section class="card glass" id="ov-record"><h2 class="h-info" id="rec-h">'+REC_LABEL[view]+info('About the record',recNote(view,rec)+' <b id="rec-str">'+rec.w+'–'+rec.l+'</b>'+(rec.be?' · '+rec.be+' BE':'')+'.','r')+'</h2><div class="grid4">'+
     '<div class="stat"><div class="l">Wins</div><div class="v pos" id="rec-w">'+rec.w+'</div></div>'+
     '<div class="stat"><div class="l">Losses</div><div class="v neg" id="rec-l">'+rec.l+'</div></div>'+
     '<div class="stat"><div class="l">BE</div><div class="v" id="rec-be">'+rec.be+'</div></div>'+
@@ -82,14 +82,19 @@ export function acctCard(a){
 export var JOURNAL_RECENT=5;
 /* Journal: Win / loss record + trade-grades calendar (scope: funded | evaluation | all) */
 /* labels stay short; the scope is carried by the segment, and the full wording by aria-labels / the (i) note */
-export var JSCOPE={funded:{name:'funded accounts',rec:'Record',gh:'Grades'},evaluation:{name:'evaluation accounts',rec:'Record',gh:'Grades'},all:{name:'all accounts',rec:'Record',gh:'Grades'}};
-export function jScope(){return JSCOPE[ui.jscope]?ui.jscope:'funded'}
+export var JSCOPE={funded:{name:'funded accounts',rec:'Record',gh:'Grades'},evaluation:{name:'evaluation accounts',rec:'Record',gh:'Grades'},both:{name:'funded + evaluation accounts',rec:'Record',gh:'Grades'}};
+export var REC_LABEL={funded:'Funded record',evaluation:'Evaluation record',both:'Combined record'};
+/* ONE Funded / Evaluation / Both choice (ui.scope) drives Overview and Journal; both read scopeRecord() so they always match */
+export function curScope(){return scopeView(ui.scope)}
+export function jScope(){return curScope()}
+export function scopeSeg(sc,id){return seg('scope',[['funded','Funded'],['evaluation','Evaluation'],['both','Both']],sc).replace('class="seg"','class="seg" id="'+id+'"')}
+export function recNote(sc,R){return 'Per trading day, '+JSCOPE[sc].name+': net &gt; 0 = win, &lt; 0 = loss, all-BE day = BE. Break-even excluded from win rate. Same count on Overview and Journal; never resets.'}
 export function jMonth(){var now=new Date();return /^\d{4}-\d{2}$/.test(ui.jcal||'')?ui.jcal:now.getFullYear()+'-'+pad(now.getMonth()+1)}
 function plu(n,w){return n+' '+w+(n===1?'':'s')}
-export function rWinLoss(){var sc=jScope(),L=JSCOPE[sc],R=dayRecord(sc);
+export function rWinLoss(){var sc=jScope(),L=JSCOPE[sc],R=scopeRecord(sc);
   var h='<div class="wl-head" id="wl-head"><div><h2 class="sec-h">Win / loss</h2></div><button class="round-add sm" data-act="openDay" data-date="'+todayS()+'" id="btn-log-round" aria-label="Log today">'+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>';
-  h+=seg('jscope',[['funded','Funded'],['evaluation','Evaluation'],['all','All-time']],sc).replace('class="seg"','class="seg" id="wl-seg"');
-  h+='<section class="card glass wl-card" id="wl-card"><div class="wl-split"><div class="wl-rec"><div class="wl-l" id="wl-rec-l">'+L.rec+info('About the record','<span id="wl-note">Per trading day, '+L.name+'. '+plu(R.noTrading,'no-trading day')+'. Break-even excluded from win rate.</span>')+'</div><div class="wl-big mono" id="wl-rec" style="--len:'+(R.w+'W — '+R.l+'L — '+R.be+'BE').length+'" aria-label="'+R.w+' wins, '+R.l+' losses, '+R.be+' break-even"><span class="pos">'+R.w+'W</span><span class="wl-sep"> — </span><span class="neg">'+R.l+'L</span><span class="wl-sep"> — </span><span class="amb">'+R.be+'BE</span></div></div>'+
+  h+=scopeSeg(sc,'wl-seg');
+  h+='<section class="card glass wl-card" id="wl-card"><div class="wl-split"><div class="wl-rec"><div class="wl-l" id="wl-rec-l">'+L.rec+info('About the record','<span id="wl-note">Per trading day, '+L.name+'. '+plu(R.noTrading,'no-trading day')+'. Break-even excluded from win rate. Same count as Overview.</span>')+'</div><div class="wl-big mono" id="wl-rec" style="--len:'+(R.w+'W — '+R.l+'L — '+R.be+'BE').length+'" aria-label="'+R.w+' wins, '+R.l+' losses, '+R.be+' break-even"><span class="pos">'+R.w+'W</span><span class="wl-sep"> — </span><span class="neg">'+R.l+'L</span><span class="wl-sep"> — </span><span class="amb">'+R.be+'BE</span></div></div>'+
     '<div class="wl-rate"><div class="wl-l">Win rate</div><div class="wl-big mono" id="wl-wr">'+(R.wr==null?'—':Math.round(R.wr*100)+'%')+'</div></div></div>'+
     '<div class="wl-foot tiny muted" id="wl-foot">'+plu(R.trading,'day')+'<span class="sr"> with trades</span></div></section>';
   h+='<div class="gr-head" id="gr-head"><h2 class="sec-h" id="gr-h">'+L.gh+'</h2></div>';
