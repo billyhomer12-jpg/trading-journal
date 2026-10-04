@@ -12,12 +12,12 @@ export var RULES=[
  'Balances only change through dated imports — no free editing of balances anywhere else.',
  'Never report progress, balances or fills that were not provided.'
 ];
-/* Starter presets shown in onboarding. Buffers are suggestions only — users must verify against their firm's current rules. */
-/* share = standard trader profit share (%) used for net payout math; rulesUrl = firm's official payout policy page. Users can edit all of it. */
+/* Generic starter firms shown in onboarding and used by the demo. Users rename them / add their own firms in
+   Get started or Settings ▸ Firms (buffer, trader share %, short name, plan and an optional Rules link). */
 export var FIRM_PRESETS=[
-  {name:'Take Profit Trader',buffer:1500,share:80,short:'TPT',plan:'Pro',rulesUrl:'https://takeprofittraderhelp.zendesk.com/hc/en-us/articles/15172219527581-PRO-Account-Profit-Split-Withdrawal-Rules'},
-  {name:'Tradeify',buffer:1000,share:90,short:'Tradeify',plan:'',rulesUrl:'https://help.tradeify.co/en/articles/12853966-select-flex-and-select-daily-payout-policies'},
-  {name:'Lucid',buffer:1100,share:90,short:'Lucid',plan:'',rulesUrl:'https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts'}];
+  {name:'Firm A',buffer:1500,share:80,short:'FA',plan:''},
+  {name:'Firm B',buffer:1000,share:90,short:'FB',plan:''},
+  {name:'Firm C',buffer:1100,share:90,short:'FC',plan:''}];
 export var APP_NAME='Trading Journal';
 /* ---- Accounts (Supabase). Leave both empty → "Test mode" (accounts stored only on this device).
    Paste from Supabase → Project Settings → API Keys: the Project URL and the PUBLISHABLE key (sb_publishable_…;

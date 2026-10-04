@@ -30,9 +30,8 @@ export function parseImport(text,defDate){
   return {blocks:blocks,errors:errors}}
 export function guessFirm(name){var n=norm(name),f=S.settings.firms;
   for(var i=0;i<f.length;i++){var fn=norm(f[i].name);if(n.indexOf(fn)>=0)return f[i].name;var ab=fn.split(' ').map(function(w){return w[0]}).join('');if(ab.length>1&&new RegExp('\\b'+ab+'\\b').test(n))return f[i].name}
-  var pick=function(re){return (f.find(function(x){return re.test(x.name)})||f[0]||{}).name};
-  if(/\btdy\b|tradeify/.test(n))return pick(/tradeify/i);
-  if(/\bluc/.test(n))return pick(/lucid/i);
+  /* the firm's own short name (e.g. "FA" in "FA-E 5102") */
+  for(var k=0;k<f.length;k++){var sh=norm(f[k].short||'');if(sh.length>1&&new RegExp('\\b'+sh.replace(/[^a-z0-9]/g,'')+'\\b').test(n))return f[k].name}
   return (f[0]||{}).name}
 export function prevBal(a,date){var h=a.history.filter(function(x){return x.date<date&&x.src!=='start'});if(!h.length)h=a.history.filter(function(x){return x.date<date});if(h.length)return h[h.length-1].balance;return a.history.length?a.history[a.history.length-1].balance:a.startBalance}
 /* Matching: (1) same lineup position + balance continuity + same name, (2) same position + continuity, (3) name + continuity, (4) name only (flagged).
