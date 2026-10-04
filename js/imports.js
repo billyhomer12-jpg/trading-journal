@@ -7,8 +7,8 @@ import { S, recompute } from './state.js';
 import { acctById } from './model.js';
 import { prevBal } from './importer.js';
 
-export var DATE_SOURCES={photo:'Date from photo',file:'Date from file',list:'Date from balance list',manual:'Date set manually',today:'Date = import day'};
-export function dateSourceLabel(im){return DATE_SOURCES[im.dateSource]||'Date from import'}
+export var DATE_SOURCES={photo:'Photo date',file:'File date',list:'List date',manual:'Set manually',today:'Import day'};
+export function dateSourceLabel(im){return DATE_SOURCES[im.dateSource]||'Import date'}
 /* the balance point an import wrote for an account (tagged; legacy imports matched by date + balance) */
 export function pointOf(im,line){var a=line.accountId&&acctById(line.accountId);if(!a)return null;
   return a.history.find(function(h){return h.imp===im.id})||a.history.find(function(h){return !h.imp&&h.src==='import'&&h.date===im.date&&h.balance===line.balance})||null}

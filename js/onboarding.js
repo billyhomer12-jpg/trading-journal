@@ -3,7 +3,7 @@ import { APP_NAME } from './config.js';
 import { $, $$, esc, fmt$, norm } from './util.js';
 import { S, save, setState, normalize, fillFirm } from './state.js';
 import { liveAccts } from './model.js';
-import { openSheet, closeSheet, toast } from './ui.js';
+import { openSheet, closeSheet, toast, info } from './ui.js';
 import { render } from './main.js';
 import { demoData } from './demo.js';
 
@@ -11,13 +11,12 @@ function firmRow(f, checked){
   return '<div class="row ob-firm" style="margin-bottom:6px" data-orig="'+esc(f.name||'')+'"><input type="checkbox" data-role="use"'+(checked?' checked':'')+' aria-label="Use firm"><input data-role="fname" value="'+esc(f.name||'')+'" placeholder="Firm name" style="flex:2"><input data-role="fbuf" type="number" inputmode="decimal" min="0" value="'+(f.buffer!=null?f.buffer:'')+'" placeholder="Buffer $" style="flex:1"></div>'}
 export function openOnboarding(rerun){
   var st=S.settings;
-  var h='<div class="ob-hero"><div class="ob-logo">📈</div><div><b>'+(rerun?'Update your setup':'Welcome to '+esc(APP_NAME))+'</b><div class="small muted">Track prop-firm accounts, trailing drawdown, daily P&amp;L and your trading behavior. Everything stays on this device.</div></div></div>';
-  h+='<div class="fld"><span>Your prop firms · trailing drawdown buffer ($)</span><div id="ob-firms">'+st.firms.map(function(f){return firmRow(f,true)}).join('')+'</div><button class="btn sm" data-act="ob" data-ob="addFirm">+ Add firm</button><div class="tiny muted" style="margin-top:6px">Buffers are starting suggestions — check your firm\'s current rules. Untick firms you don\'t use. You can change all of this later in Settings.</div></div>';
-  h+='<div class="grid2"><label class="fld"><span>Account starting balance</span><input id="ob-start" type="number" inputmode="decimal" value="'+st.startBalance+'"></label><label class="fld"><span>$ per point</span><input id="ob-dpp" type="number" inputmode="decimal" step="any" value="'+st.dollarsPerPoint+'"></label><label class="fld"><span>Risk per trade (points)</span><input id="ob-risk" type="number" inputmode="decimal" value="'+st.riskPts+'"></label><label class="fld"><span>Target per trade (points)</span><input id="ob-target" type="number" inputmode="decimal" value="'+st.targetPts+'"></label><label class="fld"><span>Break-even threshold ($)</span><input id="ob-be" type="number" inputmode="decimal" value="'+st.beThreshold+'"></label></div>';
+  var h='<div class="ob-hero"><div class="ob-logo">📈</div><div><b>'+(rerun?'Update your setup':'Welcome to '+esc(APP_NAME))+'</b><div class="small muted">Stored only on this device.</div></div></div>';
+  h+='<div class="fld"><span class="h-info">Prop firms · buffer ($)'+info('About buffers','Trailing drawdown buffers are starting suggestions — check your firm\'s current rules. Untick firms you don\'t use. You can change all of this later in Settings.')+'</span><div id="ob-firms">'+st.firms.map(function(f){return firmRow(f,true)}).join('')+'</div><button class="btn sm" data-act="ob" data-ob="addFirm">+ Add firm</button></div>';
+  h+='<div class="grid2"><label class="fld"><span>Starting balance</span><input id="ob-start" type="number" inputmode="decimal" value="'+st.startBalance+'"></label><label class="fld"><span>$ per point</span><input id="ob-dpp" type="number" inputmode="decimal" step="any" value="'+st.dollarsPerPoint+'"></label><label class="fld"><span>Risk (pts)</span><input id="ob-risk" type="number" inputmode="decimal" value="'+st.riskPts+'"></label><label class="fld"><span>Target (pts)</span><input id="ob-target" type="number" inputmode="decimal" value="'+st.targetPts+'"></label><label class="fld"><span>BE threshold ($)</span><input id="ob-be" type="number" inputmode="decimal" value="'+st.beThreshold+'"></label></div>';
   h+='<div class="note ok small" id="ob-sum"></div>';
   h+='<button class="btn primary wide" data-act="ob" data-ob="start" id="ob-start-btn" style="margin-bottom:10px">'+(rerun?'Save setup':'Start my journal')+'</button>';
-  h+='<button class="btn wide" data-act="ob" data-ob="demo" id="ob-demo-btn">'+(rerun?'Replace data with demo data':'Explore with demo data')+'</button>';
-  if(!rerun)h+='<div class="tiny muted" style="margin-top:10px;text-align:center">Demo data is clearly labelled and can be cleared any time in Settings.</div>';
+  h+='<button class="btn wide" data-act="ob" data-ob="demo" id="ob-demo-btn">'+(rerun?'Replace with demo data':'Try demo data')+'</button>';
   openSheet(rerun?'Setup':'Get started',h,'onboarding-sheet',!rerun);
   $('#onboarding-sheet').addEventListener('input',updateSum);updateSum();
 }

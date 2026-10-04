@@ -10,7 +10,7 @@ import { rCalc, scenInputs, scenOut, calcPaint, calcStep, calcReset, calcMath, c
 import { newsState, rNews, refreshNews, setNews } from './news.js';
 import { firmEditRow, downscale, handleJson, imp, impApply, impPreview, openAddAccount, openDay, openImport, openSettings, saveAccount, saveDay, saveSettings, tradeCard, updateBE } from './editors.js';
 import { demoData } from './demo.js';
-import { exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandidates, undoImport } from './imports.js';
+import { DATE_SOURCES, exifDate, importDayPnl, moveImport, moveSummary, planMove, recheckCandidates, undoImport } from './imports.js';
 import { openOnboarding, obAction } from './onboarding.js';
 import { rPayouts, openPayout, savePayout, deletePayout, payAcctChanged, setNextEligible, payCalc, setPayMode } from './payouts.js';
 
@@ -43,7 +43,7 @@ export var A={
    if(!confirm('Undo the import of '+fmtDate(im.date,{month:'short',day:'numeric',year:'numeric'})+'? This removes the '+n+' balance point'+(n===1?'':'s')+' it recorded (restoring any value it replaced), so balances and Day P&L go back to before it. Journal entries you logged are kept.'))return;
    var r=undoImport(im.id);save();render();toast('Import undone: '+(r.removed+r.restored)+' balance point'+(r.removed+r.restored===1?'':'s')+' reverted'+(r.deletedAccounts.length?', removed '+r.deletedAccounts.join(', '):''))},
  editImpDate:function(el){var im=S.imports.find(function(x){return x.id===el.dataset.id});if(!im)return;
-   openSheet('Correct trade date','<div class="small muted" style="margin-bottom:10px">'+esc(im.fileName||'Balance list')+' · currently '+fmtDate(im.date,{weekday:'short',month:'short',day:'numeric',year:'numeric'})+'</div><label class="fld"><span>Trade date</span><input type="date" id="imp-move-date" data-on="impMovePlan" data-id="'+im.id+'" value="'+im.date+'"></label><div class="small" id="imp-move-plan">Pick the day these balances belong to.</div><button class="btn primary wide" style="margin-top:12px" data-act="impMoveSave" data-id="'+im.id+'" id="imp-move-save">Move to this date</button>','imp-date-sheet')},
+   openSheet('Correct trade date','<div class="small muted" style="margin-bottom:10px">'+esc(im.fileName||'Balance list')+' · now '+fmtDate(im.date,{weekday:'short',month:'short',day:'numeric',year:'numeric'})+'</div><label class="fld"><span>Trade date</span><input type="date" id="imp-move-date" data-on="impMovePlan" data-id="'+im.id+'" value="'+im.date+'"></label><div class="small" id="imp-move-plan"></div><button class="btn primary wide" style="margin-top:12px" data-act="impMoveSave" data-id="'+im.id+'" id="imp-move-save">Move</button>','imp-date-sheet')},
  impMoveSave:function(el){var d=$('#imp-move-date').value,pl=planMove(el.dataset.id,d);if(!pl)return;if(pl.from===d)return closeSheet();
    if(pl.conflicts.length)return toast(fmtDate(d,{month:'short',day:'numeric'})+' already has a balance for '+pl.conflicts.join(', ')+' — undo that import first',true);
    moveImport(el.dataset.id,d);save();closeSheet();render();toast('Moved '+moveSummary(pl)+' to '+fmtDate(d,{month:'short',day:'numeric'}))},
@@ -114,9 +114,9 @@ export var ON={
  calcDD:function(el){ui.calc.dd=el.value;saveUi();$('#scen-out').innerHTML=scenOut();var n=$('#calc-dd');n.focus();var L=n.value.length;try{n.setSelectionRange(L,L)}catch(e){}},
  impImg:function(el){var f=el.files&&el.files[0];if(!f)return;imp.fileName=f.name||null;imp.fileDate=f.lastModified?ds(new Date(f.lastModified)):null;
    (f.arrayBuffer?f.arrayBuffer():Promise.resolve(null)).then(function(buf){imp.photoDate=buf?exifDate(buf):null;
-     if(imp.photoDate&&!imp.dateManual){$('#imp-date').value=imp.photoDate;$('#imp-date-src').textContent='Date from photo'}});
+     if(imp.photoDate&&!imp.dateManual){$('#imp-date').value=imp.photoDate;$('#imp-date-src').textContent=DATE_SOURCES.photo}});
    Promise.all([downscale(f,640,.6),downscale(f,160,.6)]).then(function(u){imp.image=u[0];imp.thumb=u[1];$('#imp-img-prev').innerHTML='<img style="width:100%;max-height:220px;object-fit:contain;border-radius:12px" src="'+u[0]+'" alt=""><div class="tiny muted">'+esc(f.name||'')+' · stored with this import ('+Math.round((u[0].length+u[1].length)*.75/1024)+' KB incl. thumbnail)</div>'}).catch(function(){toast('Could not read image',true)})},
- impDate:function(){imp.dateManual=true;var s=$('#imp-date-src');if(s)s.textContent='Date set manually'},
+ impDate:function(){imp.dateManual=true;var s=$('#imp-date-src');if(s)s.textContent=DATE_SOURCES.manual},
  impMovePlan:function(el){var pl=planMove(el.dataset.id,el.value),o=$('#imp-move-plan');if(!pl||!o)return;o.innerHTML=pl.from===el.value?'Same date — nothing to move.':pl.conflicts.length?'<span class="neg">'+esc(fmtDate(el.value,{month:'short',day:'numeric'}))+' already has a balance for '+esc(pl.conflicts.join(', '))+'.</span>':'Moves '+moveSummary(pl)+' to '+esc(fmtDate(el.value,{weekday:'short',month:'short',day:'numeric'}))+'.'},
  impDec:function(){impPreview(true)},
  jsonFile:function(el){var f=el.files&&el.files[0];if(!f)return;var r=new FileReader();r.onload=function(){handleJson(String(r.result))};r.readAsText(f)}
@@ -132,6 +132,14 @@ window.TJ={calc:function(){return calcMath()},state:function(){return clone(S)},
 render();
 if(!S.onboarded)openOnboarding(false);
 /* keyboard: Esc closes an (unlocked) sheet */
+/* (i) popovers: one open at a time, close on outside tap / Esc, nudge the bubble back on-screen */
+function closeInfos(except){document.querySelectorAll('details.info[open]').forEach(function(d){if(d!==except)d.open=false})}
+document.addEventListener('click',function(e){var d=e.target.closest&&e.target.closest('details.info');closeInfos(d)},true);
+document.addEventListener('toggle',function(e){var d=e.target;if(!d.classList||!d.classList.contains('info')||!d.open)return;closeInfos(d);
+  var p=d.querySelector('.info-pop');p.style.left='';p.style.right='';var r=p.getBoundingClientRect(),W=document.documentElement.clientWidth,dx=0;
+  if(r.right>W-12)dx=W-12-r.right;if(r.left+dx<12)dx=12-r.left;
+  if(dx){var base=r.left-d.getBoundingClientRect().left;p.style.right='auto';p.style.left=Math.round(base+dx)+'px'}},true);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var oi=document.querySelector('details.info[open]');if(oi){oi.open=false;var sm=oi.querySelector('summary');if(sm)sm.focus();e.stopImmediatePropagation();return}}},true);
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){var b=document.querySelector('.sheet-back');if(b){if(!b.dataset.lock)closeSheet()}else if(ui.acctGroup&&ui.tab==='accounts')A.closeGroup()}});
 /* PWA offline support (web only; Capacitor apps already bundle their files) */
 if(BUILD==='modular'&&'serviceWorker' in navigator&&/^https?:$/.test(location.protocol)&&!window.Capacitor){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('Service worker not registered',e)})})}
